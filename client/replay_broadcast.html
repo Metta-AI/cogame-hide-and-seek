@@ -828,14 +828,17 @@ html, body {
 #endcard .ec-thead,
 #endcard .ec-row {
   display: grid;
-  grid-template-columns: 1fr calc(22 * var(--u)) calc(22 * var(--u)) calc(26 * var(--u)) calc(26 * var(--u));
+  /* Column widths follow the re-mapped HEADINGS: "Unseen" and "Vaults" are
+     six characters wide, "Seen" four, so the numeric columns are sized to the
+     word rather than to the starter's shorter kill/death labels. */
+  grid-template-columns: 1fr calc(26 * var(--u)) calc(20 * var(--u)) calc(22 * var(--u)) calc(26 * var(--u));
   gap: calc(5 * var(--u));
   align-items: center;
 }
 #endcard .ec-thead {
   font-family: var(--finefont);
-  font-size: calc(7.5 * var(--u));
-  letter-spacing: 0.12em;
+  font-size: calc(6.6 * var(--u));
+  letter-spacing: 0.03em;
   text-transform: uppercase;
   color: var(--paper-dim);
   border-bottom: 1px solid rgba(242, 232, 216, 0.18);
