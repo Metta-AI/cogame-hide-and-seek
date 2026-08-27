@@ -2,7 +2,7 @@
 ## rules hold; the beat CSS matches exactly the kinds this game emits; the
 ## page is legible at 360 px; and the label vocabulary is the golden manifest.
 
-import std/[algorithm, os, strutils]
+import std/[algorithm, os, osproc, strutils]
 import crunchy
 import helpers
 import hns/[sim_types, labels, broadcast]
@@ -202,5 +202,21 @@ block labelManifestIsTheGoldenVocabulary:
     " does not equal tests/label_manifest.txt " & $golden
   check LabelAimPrefix == "own aim ",
     "the own-aim readback marker's prefix changed; docs/PROTOCOL.md pins it"
+
+block thePageExecutesWithNoMissingGlobals:
+  ## A DELETE-HEAVY fork of a 4 000-line page produces ReferenceErrors, not
+  ## syntax errors: removing #viewpanel and the first-person inset also
+  ## removed the `var $ = C.$;` and `var COG_BASE = …` declarations that
+  ## happened to sit inside the same regions, and the page then died at load
+  ## with one line — "$ is not defined" — while the viewer smoke timed out
+  ## ninety seconds later saying only `data-replay-loaded=null`. This runs the
+  ## page's own script blocks against a dumb DOM stub and fails on the first
+  ## missing global. Skipped where node is unavailable; CI always has it.
+  if findExe("node").len == 0:
+    echo "  (node not found: page_smoke skipped)"
+  else:
+    let outcome = execCmdEx("node tools/ci/page_smoke.mjs")
+    check outcome.exitCode == 0,
+      "tools/ci/page_smoke.mjs failed:\n" & outcome.output
 
 echo "test_hns_viewer: ok"
