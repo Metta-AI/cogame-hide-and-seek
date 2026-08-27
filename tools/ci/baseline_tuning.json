@@ -1,0 +1,74 @@
+{
+  "panelReach": 200,
+  "rampSweep": 300,
+  "flinchRadius": 140,
+  "chaseRadius": 340,
+  "pushGiveUpTicks": 120,
+  "doorRotation": 1,
+  "margin": -99,
+  "marginBand": [
+    -400,
+    400
+  ],
+  "seeds": [
+    42,
+    679961,
+    4242
+  ],
+  "grid": [
+    {
+      "panelReach": 200,
+      "flinchRadius": 140,
+      "margin": -99,
+      "wins": 2
+    },
+    {
+      "panelReach": 200,
+      "flinchRadius": 180,
+      "margin": -99,
+      "wins": 2
+    },
+    {
+      "panelReach": 200,
+      "flinchRadius": 220,
+      "margin": -99,
+      "wins": 2
+    },
+    {
+      "panelReach": 260,
+      "flinchRadius": 140,
+      "margin": -300,
+      "wins": 1
+    },
+    {
+      "panelReach": 260,
+      "flinchRadius": 180,
+      "margin": -300,
+      "wins": 1
+    },
+    {
+      "panelReach": 260,
+      "flinchRadius": 220,
+      "margin": -300,
+      "wins": 1
+    },
+    {
+      "panelReach": 320,
+      "flinchRadius": 140,
+      "margin": -250,
+      "wins": 1
+    },
+    {
+      "panelReach": 320,
+      "flinchRadius": 180,
+      "margin": -250,
+      "wins": 1
+    },
+    {
+      "panelReach": 320,
+      "flinchRadius": 220,
+      "margin": -250,
+      "wins": 1
+    }
+  ]
+}

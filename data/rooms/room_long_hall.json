@@ -1,0 +1,559 @@
+{
+  "name": "long_hall",
+  "w": 720,
+  "h": 400,
+  "symmetry": "symNone",
+  "walls": [
+    [
+      0,
+      0,
+      720,
+      16
+    ],
+    [
+      0,
+      384,
+      720,
+      16
+    ],
+    [
+      0,
+      16,
+      16,
+      368
+    ],
+    [
+      704,
+      16,
+      16,
+      368
+    ],
+    [
+      264,
+      16,
+      16,
+      224
+    ],
+    [
+      440,
+      160,
+      16,
+      224
+    ]
+  ],
+  "regions": [
+    {
+      "id": "l1",
+      "name": "west end",
+      "box": [
+        16,
+        16,
+        248,
+        368
+      ],
+      "doors": [
+        "d1"
+      ]
+    },
+    {
+      "id": "l2",
+      "name": "middle",
+      "box": [
+        280,
+        16,
+        160,
+        368
+      ],
+      "doors": [
+        "d1",
+        "d2"
+      ]
+    },
+    {
+      "id": "l3",
+      "name": "east end",
+      "box": [
+        456,
+        16,
+        248,
+        368
+      ],
+      "doors": [
+        "d2"
+      ]
+    }
+  ],
+  "doors": [
+    {
+      "id": "d1",
+      "at": [
+        272,
+        312
+      ],
+      "w": 144,
+      "axis": "v"
+    },
+    {
+      "id": "d2",
+      "at": [
+        448,
+        88
+      ],
+      "w": 144,
+      "axis": "v"
+    }
+  ],
+  "anchors": [
+    {
+      "id": "h1",
+      "kind": "pad",
+      "at": [
+        64,
+        64
+      ],
+      "team": "hiders"
+    },
+    {
+      "id": "h2",
+      "kind": "pad",
+      "at": [
+        64,
+        336
+      ],
+      "team": "hiders"
+    },
+    {
+      "id": "h3",
+      "kind": "pad",
+      "at": [
+        160,
+        200
+      ],
+      "team": "hiders"
+    },
+    {
+      "id": "s1",
+      "kind": "pad",
+      "at": [
+        656,
+        200
+      ],
+      "team": "seekers"
+    },
+    {
+      "id": "s2",
+      "kind": "pad",
+      "at": [
+        656,
+        88
+      ],
+      "team": "seekers"
+    },
+    {
+      "id": "s3",
+      "kind": "pad",
+      "at": [
+        656,
+        312
+      ],
+      "team": "seekers"
+    },
+    {
+      "id": "p1",
+      "kind": "pocket",
+      "at": [
+        40,
+        40
+      ],
+      "team": ""
+    },
+    {
+      "id": "p2",
+      "kind": "pocket",
+      "at": [
+        40,
+        360
+      ],
+      "team": ""
+    },
+    {
+      "id": "p3",
+      "kind": "pocket",
+      "at": [
+        240,
+        40
+      ],
+      "team": ""
+    },
+    {
+      "id": "p4",
+      "kind": "pocket",
+      "at": [
+        240,
+        360
+      ],
+      "team": ""
+    },
+    {
+      "id": "p5",
+      "kind": "pocket",
+      "at": [
+        320,
+        200
+      ],
+      "team": ""
+    },
+    {
+      "id": "p6",
+      "kind": "pocket",
+      "at": [
+        400,
+        200
+      ],
+      "team": ""
+    },
+    {
+      "id": "p7",
+      "kind": "pocket",
+      "at": [
+        480,
+        40
+      ],
+      "team": ""
+    },
+    {
+      "id": "p8",
+      "kind": "pocket",
+      "at": [
+        480,
+        360
+      ],
+      "team": ""
+    },
+    {
+      "id": "q1",
+      "kind": "patrol",
+      "at": [
+        140,
+        104
+      ],
+      "team": ""
+    },
+    {
+      "id": "q2",
+      "kind": "patrol",
+      "at": [
+        140,
+        296
+      ],
+      "team": ""
+    },
+    {
+      "id": "q3",
+      "kind": "patrol",
+      "at": [
+        360,
+        104
+      ],
+      "team": ""
+    },
+    {
+      "id": "q4",
+      "kind": "patrol",
+      "at": [
+        360,
+        296
+      ],
+      "team": ""
+    },
+    {
+      "id": "q5",
+      "kind": "patrol",
+      "at": [
+        560,
+        104
+      ],
+      "team": ""
+    },
+    {
+      "id": "q6",
+      "kind": "patrol",
+      "at": [
+        560,
+        296
+      ],
+      "team": ""
+    }
+  ],
+  "objectSpawns": [
+    {
+      "at": [
+        80,
+        72
+      ],
+      "kinds": [
+        "crate",
+        "ramp"
+      ],
+      "axis": "v"
+    },
+    {
+      "at": [
+        80,
+        200
+      ],
+      "kinds": [
+        "crate",
+        "ramp"
+      ],
+      "axis": "h"
+    },
+    {
+      "at": [
+        80,
+        328
+      ],
+      "kinds": [
+        "crate",
+        "ramp"
+      ],
+      "axis": "v"
+    },
+    {
+      "at": [
+        200,
+        72
+      ],
+      "kinds": [
+        "crate",
+        "ramp"
+      ],
+      "axis": "h"
+    },
+    {
+      "at": [
+        200,
+        200
+      ],
+      "kinds": [
+        "panel"
+      ],
+      "axis": "v"
+    },
+    {
+      "at": [
+        200,
+        328
+      ],
+      "kinds": [
+        "crate",
+        "ramp"
+      ],
+      "axis": "h"
+    },
+    {
+      "at": [
+        360,
+        72
+      ],
+      "kinds": [
+        "crate",
+        "ramp"
+      ],
+      "axis": "v"
+    },
+    {
+      "at": [
+        360,
+        200
+      ],
+      "kinds": [
+        "panel"
+      ],
+      "axis": "v"
+    },
+    {
+      "at": [
+        360,
+        328
+      ],
+      "kinds": [
+        "crate",
+        "ramp"
+      ],
+      "axis": "v"
+    },
+    {
+      "at": [
+        520,
+        72
+      ],
+      "kinds": [
+        "crate",
+        "ramp"
+      ],
+      "axis": "h"
+    },
+    {
+      "at": [
+        520,
+        200
+      ],
+      "kinds": [
+        "panel"
+      ],
+      "axis": "v"
+    },
+    {
+      "at": [
+        520,
+        328
+      ],
+      "kinds": [
+        "crate",
+        "ramp"
+      ],
+      "axis": "h"
+    },
+    {
+      "at": [
+        160,
+        128
+      ],
+      "kinds": [
+        "panel"
+      ],
+      "axis": "h"
+    },
+    {
+      "at": [
+        160,
+        272
+      ],
+      "kinds": [
+        "panel"
+      ],
+      "axis": "h"
+    },
+    {
+      "at": [
+        360,
+        128
+      ],
+      "kinds": [
+        "panel"
+      ],
+      "axis": "h"
+    },
+    {
+      "at": [
+        120,
+        72
+      ],
+      "kinds": [
+        "crate",
+        "ramp"
+      ],
+      "axis": "h"
+    },
+    {
+      "at": [
+        120,
+        328
+      ],
+      "kinds": [
+        "crate",
+        "ramp"
+      ],
+      "axis": "h"
+    },
+    {
+      "at": [
+        200,
+        136
+      ],
+      "kinds": [
+        "crate",
+        "ramp"
+      ],
+      "axis": "v"
+    },
+    {
+      "at": [
+        200,
+        264
+      ],
+      "kinds": [
+        "crate",
+        "ramp"
+      ],
+      "axis": "v"
+    },
+    {
+      "at": [
+        320,
+        72
+      ],
+      "kinds": [
+        "crate",
+        "ramp"
+      ],
+      "axis": "h"
+    },
+    {
+      "at": [
+        320,
+        328
+      ],
+      "kinds": [
+        "crate",
+        "ramp"
+      ],
+      "axis": "h"
+    },
+    {
+      "at": [
+        400,
+        128
+      ],
+      "kinds": [
+        "crate",
+        "ramp"
+      ],
+      "axis": "v"
+    },
+    {
+      "at": [
+        400,
+        272
+      ],
+      "kinds": [
+        "crate",
+        "ramp"
+      ],
+      "axis": "v"
+    },
+    {
+      "at": [
+        560,
+        128
+      ],
+      "kinds": [
+        "crate",
+        "ramp"
+      ],
+      "axis": "v"
+    },
+    {
+      "at": [
+        560,
+        272
+      ],
+      "kinds": [
+        "crate",
+        "ramp"
+      ],
+      "axis": "v"
+    }
+  ]
+}

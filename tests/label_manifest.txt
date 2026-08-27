@@ -1,0 +1,18 @@
+# The GOLDEN sprite-label vocabulary. Every string src/hns/labels.nim publishes
+# as contract, one per line, sorted. Regenerate it in the same commit as any
+# label change — a rename is a breaking change to every wire reader.
+broadcast chrome
+carry tether
+cog
+crate
+locked crate
+locked panel
+locked ramp
+map band
+padlock
+panel
+ramp
+shout bubble
+spotted ring
+vault arc
+vision cone

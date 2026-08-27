@@ -1,0 +1,14 @@
+# ONE service, because the manifest's image placeholder is derived from the
+# compose SERVICE NAME by uppercasing and mapping `-` to `_`:
+# `hide-and-seek` -> `{{HIDE_AND_SEEK_IMAGE}}`. The one-image /
+# two-entrypoints shape is deliberate: `tools/ci/docker_smoke.sh` and
+# `tools/ci/policies.json` both assume a single image, and it is what keeps a
+# champion and a scripted filler byte-identical apart from their environment.
+services:
+  hide-and-seek:
+    image: coworld-hide-and-seek:latest
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: Dockerfile
+      network: host

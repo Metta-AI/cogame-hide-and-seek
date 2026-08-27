@@ -1,0 +1,35 @@
+[
+  {
+    "name": "hns-quartermaster",
+    "run": "/bin/hide-and-seek-player",
+    "env": {
+      "PLAYER_PROMPT": "Build a room inside the room, and lock it.\nAS A HIDER: turn 1, pick the region with the FEWEST doors that no seeker pad is in, radio\nits id and claim one door each. Your first order is always \"push\" - fetch the nearest crate\nor panel to your door and drop it IN the gap. A panel covers a 56px door on its own; a\ncrate needs a second crate beside it. Turn 2, \"lock\" what you just placed - an unlocked\ncrate is a ten-second delay, a locked one lasts the whole hunt. Turn 3, if both your\ndoors are sealed and locked, take the nearest RAMP and push it to the far corner of the\nmap, then lock it there: a ramp left near your fort is the seekers' key. Only when the\nramps are gone do you \"hide\" at a pocket inside the fort, facing the sealed door, and then\nyou do not move again - a moving cog is a seen cog. Never shout during the hunt.\nAS A SEEKER: turn 1, radio which door you take and go straight to the region the hiders\ndid NOT wall up - the open ones are checked in ten seconds. When you find a sealed door,\ndo not stand there: say \"wall\" and check whether a ramp is still unlocked; if one is,\n\"push\" it to the sealed wall and then \"vault\" it. If every ramp is locked, \"push\" the\ncrates that are NOT locked out of the gap instead - unlocked furniture is a door with a\ndelay. Once you have a hider in your cone, \"watch\" it and radio its position: the tick\ncounts while ANY seeker sees ANY hider, so the cog that has one holds it and the other two\ngo find the next one.",
+      "PLAYER_POLICY_LABEL": "quartermaster"
+    }
+  },
+  {
+    "name": "hns-torchbearer",
+    "run": "/bin/hide-and-seek-player",
+    "env": {
+      "PLAYER_PROMPT": "Deny sightlines, do not build walls.\nAS A HIDER: forts fail when the seekers bring a ramp, so spend prep making the room\nUNSEEABLE instead. Turn 1: push a crate into the middle of the longest open sightline in\nthe room and radio which line you broke. Turn 2: push a second crate 100-150px from the\nfirst so the two together break the diagonal as well. Turn 3: lock both, then take a ramp\nto a corner and lock it. Then \"hide\" behind a crate - not in a pocket a seeker will sweep,\nbut on the far side of an object it must walk around, and re-choose that side EVERY turn\nfrom where the seekers were last seen: if \"seen_enemies\" or \"heard\" puts one within 250px,\nyour next order moves you to the opposite face of your crate. Keep moving in small steps\nand never cross an open region.\nAS A SEEKER: split the room and never re-check a region a teammate has cleared. Turn 1\nradio the region you take and \"watch\" its far corner from the doorway before you enter -\nyour cone is 340px, so standing in a doorway sees the whole small region without walking\ninto an ambush. Then sweep: \"watch\" a point, then \"watch\" a point 90 degrees off it, then\nmove. When \"heard\" reports a shout, go straight to it. When you spot a hider, do NOT chase\nit out of your cone: \"watch\" the point it is standing on, radio it, and let a teammate cut\nit off - the score counts every tick it is visible, and a chase you lose is worth nothing.",
+      "PLAYER_POLICY_LABEL": "torchbearer"
+    },
+    "player": "ply_bac48eb1-662e-44f8-973d-f3e016dccf5d"
+  },
+  {
+    "name": "hns-burrow",
+    "run": "/bin/hide-and-seek-player",
+    "env": {
+      "PLAYER_SCRIPTED": "burrow",
+      "PLAYER_POLICY_LABEL": "burrow"
+    }
+  },
+  {
+    "name": "hns-scatter",
+    "run": "/bin/hide-and-seek-player",
+    "env": {
+      "PLAYER_SCRIPTED": "scatter",
+      "PLAYER_POLICY_LABEL": "scatter"
+    }
+  }
+]

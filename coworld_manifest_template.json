@@ -1,0 +1,852 @@
+{
+  "$schema": "https://softmax.com/schemas/coworld-manifest.json",
+  "tags": [
+    "hide-and-seek",
+    "stealth",
+    "team",
+    "tool-use",
+    "line-of-sight"
+  ],
+  "episode_timeout_minutes": 20,
+  "game": {
+    "name": "hide-and-seek",
+    "owner": "daveey@softmax.com",
+    "description": "Three cogs hide, three cogs seek, nobody has a weapon. Fifteen seconds to drag crates, wall a doorway and lock it; thirty seconds of torch cones looking for you; then the trios swap sides and play the same room again.",
+    "runnable": {
+      "type": "game",
+      "image": "{{HIDE_AND_SEEK_IMAGE}}",
+      "run": [
+        "/bin/hide-and-seek"
+      ],
+      "env": {
+        "ANTHROPIC_API_KEY_URI": "secret://coworld/hide-and-seek/anthropic_api_key"
+      }
+    },
+    "replay_viewer": {
+      "bundle": "static-replay-viewer"
+    },
+    "protocols": {
+      "player": {
+        "type": "uri",
+        "value": "https://github.com/Metta-AI/cogame-hide-and-seek/blob/main/docs/PROTOCOL.md"
+      },
+      "global": {
+        "type": "uri",
+        "value": "https://github.com/Metta-AI/cogame-hide-and-seek/blob/main/docs/PROTOCOL.md"
+      }
+    },
+    "docs": {
+      "readme": {
+        "type": "text",
+        "value": "# cogame-hide-and-seek\n\nThree cogs hide. Three cogs seek. Nobody has a weapon.\n\nA **720 x 400 room** with walls, doorways and eight pieces of movable\nfurniture \u2014 four crates, two panels, two ramps. The **hiders** get fifteen\nseconds alone in it: drag the furniture, wall off a doorway, **lock** what you\nbuilt, and drag the ramps out of reach before anybody can use them. Then a door\nopens and the **seekers** walk in with 70-degree torch cones and thirty seconds\nto look.\n\nEvery tick in which **any** hider is inside **any** seeker's cone pays the\nseekers a point; every tick in which all three hiders are unseen pays the\nhiders. Then the two trios **swap sides** and play the same room and the same\nfurniture again, and the episode's score is the average of the two \u2014 so the\nleague grades the policy, not the deal.\n\n**A policy is just a prompt.** A seat sends one JSON order per 3.75-second turn\n\u2014 `move_to`, `hide`, `watch`, `chase`, `push`, `lock`, `unlock`, `vault` \u2014 and a\ndeterministic driver carries it out. The same image ships two scripted\nbaselines (`burrow`, `scatter`) selected by an environment variable, so a\nchampion and a filler are byte-identical apart from their environment.\n\n- Rules: [`docs/RULES.md`](docs/RULES.md)\n- The object layer: [`docs/OBJECTS.md`](docs/OBJECTS.md)\n- Wire protocol: [`docs/PROTOCOL.md`](docs/PROTOCOL.md)\n\n## What it is a fork of\n\nThis repo is a fork of **[coworld-ctf](https://github.com/Metta-AI/coworld-ctf)**\n(the paintbot / crewrift engine). It keeps that engine's continuous 2-D motion\nwith slide collision, its recursive-shadowcast fog of war and aim-carried vision\ncone, its Sprite v1 protocol and mummy websocket server, its binary\n`COWLD\u2026` replay of per-tick input masks plus a per-tick `gameHash`\nre-simulated by the SAME sim module compiled to wasm, and its broadcast chrome.\n\nWhat it deletes, rather than disables: the gun, spray, grenades, med kits,\nshields, barriers, hit points, lives, respawns, the flag/heart objective, floor\npaint, King of the Hill, four-team play, the first-person inset, and the whole\nprocedural map generator with its pool, editor and mapkit.\n\nWhat it adds: a dynamic **object layer** (grab, push, lock, vault, keep-clear\ndiscs, dirty-rect occlusion rebuilds), a **two-phase clock** with a side swap,\nand the **+/-1 per tick seen/unseen** team reward.\n\nThe rules idiom is Baker et al. 2019, *Emergent Tool Use From Multi-Agent\nAutocurricula* (`openai/multi-agent-emergence-environments`). The five facts\nborrowed from it are transcribed with their citations in\n[`src/hns/upstream.nim`](src/hns/upstream.nim) and asserted by\n`tests/test_hns_upstream.nim`. **Box surfing is deliberately not reproduced** \u2014\nit is an exploit of MuJoCo's 3-D contact dynamics with no meaning in a top-down\n2-D sim.\n\n## Layout\n\n- `src/hide_and_seek.nim` \u2014 server entrypoint (the seed is randomised HERE,\n  before `config.update`, so every seed-derived draw follows the final seed).\n- `src/hide_and_seek_player.nim` \u2014 the thin seat registrar\n  (`/bin/hide-and-seek-player`).\n- `src/hns/` \u2014 the sim: `sim_types` (consts, wire types, `GameVersion`),\n  `room` (the authored room documents and their validator), `objects` (the\n  object layer), `phase` (the two-phase clock and the exposure counters),\n  `fort` (the sealed-fort scan), `vision` (the shadowcast), `motion` (the\n  fixed-point integrator), `sim` (the step loop), `server`, `broadcast`,\n  `global` (the board compositor), `decide` / `directives` / `llm` /\n  `baselines` / `control` (the commander layer), `replays`.\n- `data/rooms/room_{warren,atrium,long_hall}.json` \u2014 the three committed rooms.\n  Re-author them with `scripts/rooms/author_rooms.py`, and re-pin their sha256s\n  in `tests/test_hns_room.nim` in the same commit.\n- `scripts/art/` \u2014 the nano-banana source sheets and the split script that turn\n  them into `data/cog_{hider,seeker}.png` and `data/obj_{crate,panel,ramp}.png`.\n- `tests/` \u2014 run `nim c -r tests/tests.nim` from the repo ROOT.\n\n## Building\n\nDependencies come from nimby; the `Dockerfile` is the canonical recipe.\n\n```bash\nnimby --global sync nimby.lock\nnim c -r tests/tests.nim\ndocker compose build\n```\n\nThe static replay viewer is built by `tools/build_replay_viewer.sh` through the\npinned `emscripten/emsdk:4.0.15` container in `Dockerfile.replay-viewer`. It is\nthe `coworld build` hook and must stay committed **executable**.\n\n## Playing your own policy\n\n```bash\ncoworld upload-policy coworld-hide-and-seek:latest --name my-hns \\\n  --run /bin/hide-and-seek-player \\\n  --secret-env PLAYER_PROMPT=\"<your strategy>\"\n```\n"
+      },
+      "pages": [
+        {
+          "id": "rules.md",
+          "title": "Rules",
+          "content": {
+            "type": "text",
+            "value": "# Rules \u2014 hide and seek\n\nA **room**, 720 x 400 pixels, with walls, doorways and eight pieces of movable\nfurniture: four crates, two panels and two ramps. **Three hiders** get fifteen\nseconds alone in it \u2014 they can drag the furniture, wall off a doorway, build a\nfort, lock what they have built, and drag the ramps out of reach. Then a door\nopens and **three seekers** walk in with torch-beam vision cones and thirty\nseconds to look. Every tick in which **any** hider is inside **any** seeker's\ncone costs the hiders a point and pays the seekers one; every tick in which all\nthree hiders are unseen does the reverse. Then the two trios swap sides and play\nthe room again, and the episode's score is the average.\n\nThere are no weapons and nobody can be killed: the only thing that happens in\nthis game is that somebody is looking and somebody else does not want to be\nfound.\n\n## Seats, cogs, aliases\n\n- **`num_agents` = 6**, always \u2014 in both manifest variants and in the\n  certification fixture. One cog per seat: three hiders and three seekers.\n- **Sides are dealt by slot parity and swap between the episode's two games.**\n  Game 1: slots 0, 2, 4 hide; game 2: the same six seats, sides swapped. Hiding\n  and seeking are not symmetric jobs, so a league that graded a seat on one of\n  them would be grading the deal, not the policy.\n- **Two name spaces.** In-game a cog is `<ROLE>-<identity>`: `HIDER-alpha`,\n  `HIDER-beta`, `HIDER-gamma`, `SEEKER-alpha`, `SEEKER-beta`, `SEEKER-gamma`.\n  The identity is fixed to the SEAT for the whole episode and only the role\n  prefix flips at the swap. Those aliases are the only names in an observation,\n  a prompt, an order, a shout, a radio line or a sprite label. The seats' real\n  policy names live only in `results.names`, in the replay's join records and\n  in the viewer's scorebug \u2014 `showPlayerLabels` is false in every variant.\n\n## The clock\n\n- **Tick** = 1/24 s. **Turn** = one order round every `turnTicks` = 90 ticks\n  (3.75 s).\n- **One game** = `prepTurns` 4 (360 ticks, 15.0 s) + `huntTurns` 8 (720 ticks,\n  30.0 s) = 12 turns, `maxTicks` = 1080 ticks (45 s). `maxTicks` is DERIVED\n  from the phase lengths and is not a config field, so the phase clock and the\n  tick cap can never disagree.\n- **One episode** = `maxGames` 2, sides swapped between them.\n- **Prep**: seekers are frozen at their pads \u2014 their input masks are forced to\n  zero, they take no LLM call, their fov is not computed, and no scoring runs.\n- **Release**: at `tick == prepTicks` the seekers' torches come on, a `release`\n  event fires and scoring starts on the first hunt tick.\n\n## Vision\n\n- **Forward cone**: half-angle `visionConeDeg` = 35 (a 70-degree beam) around\n  the AIM angle, reaching `sightRange` = 340 px, with walls AND FURNITURE\n  blocking it.\n- **Bubble**: `visionBubble` = 48 px omnidirectional, still line-of-sight\n  blocked.\n- Aim carries vision: you see where you point, not where you walk. Both roles\n  have the same eyes.\n\n## Scoring\n\nPer game `g`, over the hunt ticks actually played:\n\n```\nseenTicks[g]      = hunt ticks on which ANY seeker saw ANY hider\nhiddenTicks[g]    = huntTicksPlayed[g] - seenTicks[g]\nmarginPermille[g] = (hiddenTicks[g] - seenTicks[g]) * 1000 div huntTicksPlayed[g]\n```\n\n`marginPermille[g]` is written from the HIDING trio's point of view. For each\nseat `s`, with `side(s, g) = +1` when the seat hid in game `g` and `-1` when it\nsought:\n\n```\nscorePermille[s] = ( side(s,0) * margin[0] + side(s,1) * margin[1] ) div 2\nscores[s]        = scorePermille[s] / 1000.0        in [-1.0, +1.0]\n```\n\n**Higher is better.** Because every seat hides in exactly one game and seeks in\nthe other, and the two trios are complementary, **the six scores sum to exactly\nzero**. `results.win[s]` is `scorePermille[s] > 0`; an all-zero margin is a draw\nand every `win` is false. There is no `results.winner` key \u2014 the trios change\ncomposition between games, so the only meaningful verdict is the per-seat\nnumber.\n\n**Everything else is measured and shown, never scored**: `seatSeenTicks`,\n`sealedTicks`, `locks`, `grabs`, `vaults`, `pushedPx`, `shouts`.\n\n## The reply schema\n\nOne JSON object per seat per turn:\n\n```json\n{\"intent\": \"push\", \"object\": \"box2\", \"to\": [188, 208], \"at\": \"d1\",\n \"face\": [300, 200], \"say\": \"on it\", \"radio\": \"pan1 on d1, I take the gap\",\n \"notes\": \"then lock both\"}\n```\n\n| Field | Cap / domain |\n|---|---|\n| `intent` | <= 12 runes; `move_to` \\| `hide` \\| `watch` \\| `chase` \\| `push` \\| `lock` \\| `unlock` \\| `vault`. Unknown repairs to `watch` |\n| `object` | <= 8 runes; required for `push`/`lock`/`unlock`/`vault`, and a ramp for `vault` |\n| `to` | `[x, y]`, clamped into the board |\n| `at` | <= 4 runes; a published anchor / door / region id. WINS over `to` |\n| `face` | optional bearing the driver aims at once it arrives |\n| `say` | <= 10 runes \u2014 an IN-WORLD SHOUT, heard by BOTH teams within 144 px |\n| `radio` | <= 96 runes \u2014 the TEAM channel, delivered next turn, never audible |\n| `notes` | <= 160 runes \u2014 private, echoed back to this seat only |\n| whole reply | <= 4096 bytes read from the provider before parsing |\n\nUnknown top-level keys are ignored. A reply with a valid `say`/`radio` but no\n`intent` is USABLE: the cog keeps its standing order and the line is delivered.\nAn intent whose required argument is missing or unresolvable is REPAIRED to the\nprevious order, counted in `ordersRejected`, and reported next turn in `result`.\n\n**Every string that lands in the replay is truncated on RUNE boundaries.** Byte\ntruncation is what makes a replay that renders in a browser fail a strict UTF-8\nparser.\n\n## The driver\n\n| Intent | What the driver does | Finishes with |\n|---|---|---|\n| `move_to` | flow-field nav to the point; stop inside `ArriveRadius` | `moving` -> `arrived`, `no_route` |\n| `hide` | nav there, stop dead, aim at `face` else the nearest door | `arrived` -> `holding` |\n| `watch` | never moves; sweeps +/-32 brads around the bearing | `holding` |\n| `chase` | nav to the last known enemy position, then `watch` it | `chasing` -> `arrived` |\n| `push` | standoff -> grab -> drag the OBJECT's centre to the target -> release | `pushing` -> `pushed`, `push_stuck`, `grab_failed` |\n| `lock` / `unlock` | standoff, then press `A` inside `lockReach` | `locked` / `unlocked` / `lock_refused` |\n| `vault` | standoff at the ramp's foot, then drive along the axis | `vaulted` / `vault_failed` |\n\nNo intent can leave a cog unactuated: an unreachable target degrades to `watch`\non the current bearing, which is a legal mask.\n\n## Scripted baselines\n\n`burrow` (`PLAYER_SCRIPTED=burrow`) walls a doorway, locks what it placed and\ndrags the ramps away; `scatter` (`PLAYER_SCRIPTED=scatter`) never touches the\nfurniture and keeps moving between pockets. Both implement BOTH ROLES, because\nsides swap mid-episode. `burrow` is also the server-side fallback when a seat's\nLLM call fails twice \u2014 the same proc, imported, never duplicated.\n\n## End conditions\n\n`results.reason` is a closed enum and the game emits nothing else:\n\n- **`complete`** \u2014 both games played to `maxTicks`. `endRule = \"full_time\"`.\n- **`deadline`** \u2014 the wall clock reached `wallClockBudgetSeconds` (660 s). The\n  engine stops at the current tick and settles with the REAL numbers so far.\n  `endRule = \"wall_clock\"`.\n- **`fault`** \u2014 caught; the episode is settled from the last completed tick,\n  `endRule` in `{sim_fault, host_error}`, `stopDetail` names it.\n\nA seat that never connects, disconnects, or fails every decision **does not end\nthe episode**: its cog is driven by `burrow` and the episode runs to its natural\nend with `deadSeats[s] = true`.\n\n## Divergences from Baker et al. 2019\n\nThe rules idiom is *Emergent Tool Use From Multi-Agent Autocurricula*\n(`openai/multi-agent-emergence-environments`); the five facts this game borrows\nare transcribed with their citations in `src/hns/upstream.nim`. What differs:\n\n1. **This is a rules-idiom reimplementation, not a port.** MuJoCo physics, the\n   3-D geometry, the RL observation vectors and BOX SURFING are not reproduced.\n   Box surfing is an artefact of MuJoCo's 3-D contact model with no meaning in a\n   top-down 2-D sim; the autocurriculum this game ships is fort -> ramp -> lock.\n2. **Teammates are not fogged.** The starter fogs everyone. Three cogs\n   coordinating a fort at a 3.75 s cadence cannot do it blind, and the `radio`\n   channel already gives them a voice. Enemies are fogged exactly as the starter\n   fogs them.\n3. **Objects are dynamic occluders**, which the starter's static `fovBlocked`\n   grid never had to be. The dirty-rect rebuild and the `geometryEpoch` cache\n   invalidation are the whole cost.\n4. **An airborne cog is visible over furniture.** Visibility of a vaulting\n   target uses `lineOfSightClear` against the STATIC wall mask. Without it the\n   vault \u2014 the one dramatic act in the game \u2014 would happen invisibly behind the\n   crate it is jumping.\n5. **Keep-clear discs around the seeker pads.** Upstream's seekers start outside\n   the arena; here, without this rule, the dominant hider strategy is to brick\n   the seekers in, which is a 1000-permille win and a boring replay.\n6. **`maxGames = 2` with a side swap**, and the episode score is the mean.\n   Upstream trains both roles across episodes; a league needs the comparison\n   inside one episode.\n7. **The 15 s prep / 30 s hunt split** is this repo's, sized by the wall clock,\n   not upstream's step counts.\n\n## Sprite labels\n\nThe emitted board vocabulary is the contract in `src/hns/labels.nim`, pinned by\n`tests/label_manifest.txt`: `cog`, `crate`, `panel`, `ramp`, `locked crate`,\n`locked panel`, `locked ramp`, `padlock`, `vision cone`, `carry tether`,\n`vault arc`, `shout bubble`, `map band`, `broadcast chrome`, `spotted ring`,\nplus the `own aim <brads>` readback marker.\n"
+          }
+        },
+        {
+          "id": "objects.md",
+          "title": "Boxes, ramps and the lock",
+          "content": {
+            "type": "text",
+            "value": "# Boxes, ramps and the lock\n\nEight objects per game, all axis-aligned rectangles, all **opaque to vision**\nand all **solid to movement**:\n\n| Id | Kind | Size (px) | Count | Notes |\n|---|---|---|---|---|\n| `box1`\u2026`box4` | crate | 64 x 64 | 4 | the fort bricks |\n| `pan1`, `pan2` | panel | 128 x 32 (`h`) or 32 x 128 (`v`) | 2 | one panel covers a 56 px door with room to spare |\n| `ramp1`, `ramp2` | ramp | 40 x 80 (`v`) or 80 x 40 (`h`) | 2 | the only way over a locked wall |\n\nEvery object carries `pos` (integer px, top-left), `kind`, `axis`,\n`lockedBy` in `{none, hiders, seekers}` and `heldBy` (slot index or -1). All of\nit is in `gameHash`.\n\n## The deal is seeded, not authored\n\nThe room's `objectSpawns` are shuffled by the episode's `setupRng` and the first\n`crates` crate-capable, `panels` panel-capable and `ramps` ramp-capable\ncandidates are taken in that fixed order, each object taking its candidate's\naxis. **The same deal is used for both games of the episode** \u2014 the two trios\nplay the same room and the same furniture, which is what makes the swap a fair\ncomparison \u2014 and it is pinned into the replay config.\n\nThe draw happens **before any seat connects**, so nothing a seat does can shift\nit. Neither can the room: the episode's room is `pool[seed mod 3]`.\n\nA candidate is skipped if the object would overlap a static wall, another\nobject, a spawn pad, or a keep-clear disc.\n\n## Grab (button `C`, bit 7)\n\nHold `C` to grab, release to drop. On a fresh press, a segment is probed from\nthe cog's centre **along its aim**, from the body edge out to `grabReach` = 30\npx. The FIRST object the segment meets binds \u2014 nothing beyond it. An object\nlocked by the OTHER team refuses and emits `lock_refused`; an object already\nheld by another cog refuses. Ties (two cogs in the same tick) go to the lower\nslot; the loser gets a `grab_failed`.\n\nA held object is dropped when `C` is released, when the cog has been dead\nstopped against a refusal for `grabBreakTicks` = 24 ticks, when the phase\nchanges, or when the game ends.\n\n## Push\n\nA holder moves at `carrySpeedPct` = 55 % of normal speed, and its held object\ntranslates **rigidly** with it. The move commits only if, after it, the object's\nrectangle overlaps no static wall, no other object, no cog other than the\nholder, and no keep-clear disc; otherwise **neither** moves this tick, the\nvelocity on the blocked axis is zeroed, and `pushBlockedTicks` counts it. The\nstarter's per-axis slide is applied to the PAIR, so a crate runs along a wall\ninstead of sticking to it.\n\n### Keep-clear discs\n\nNo object may be moved to within `keepClearPx` = 96 px of a **seeker pad**.\nWithout this a hider trio can wall the seekers in during prep and win 1000\npermille with no game played; with it, sealing a *fort* is legal and sealing\n*the door the seekers come out of* is not. The refusal is the ordinary push\nrefusal, so it degrades into \"the crate stops here\".\n\n## Lock (button `A`)\n\n`A` toggles the lock on the held object, else on the object nearest the cog's\ncentre within `lockReach` = 30 px of its rectangle.\n\n- `lockedBy == none` -> `lockedBy = your team`, `lock` event.\n- `lockedBy == your team` -> `lockedBy = none`, `unlock` event.\n- `lockedBy == the other team` -> refused, `lock_refused` event.\n\nEither way `lockCooldown` = 24 ticks. **Locking is the whole game**: an unlocked\nwall is a wall for ten seconds, a locked wall is a wall for the rest of the\nhunt. A locked object is still solid and still opaque to both teams.\n\n## Vault\n\nA cog that holds nothing, whose centre is inside a **ramp's** rectangle, whose\nvelocity along the ramp axis toward its head is at least `MaxSpeed div 2`, and\nfor which the first blocking span beyond the head is at most `vaultSpanPx` = 112\npx thick, goes **airborne**: `vaultTicks` = 10 ticks at 5 px/tick (50 px in\nall), ignoring wall and object collisions. On the last airborne tick it lands at\nthe first clear position along the axis; if none is clear it is refunded to the\nramp's foot (`vault_failed`).\n\nWhile airborne a cog cannot grab or lock, **and it is visible over the\nfurniture**: visibility of an airborne target is tested against the STATIC WALL\nMASK only, because its head is above the crates. Vaulting is how you get in;\nbeing seen doing it is what it costs.\n\n## The sealed-fort scan\n\nAt every turn boundary and at the release tick, a breadth-first fill runs over\nthe 8 px fog grid from every seeker's cell, blocked by static walls and by\nobjects the **hiders have locked**. Unlocked objects are passable \u2014 a seeker can\nshove them. Every hider the fill does not reach is `sealed`, and `sealedTicks`\naccumulates the hunt ticks it spent that way.\n\n`sealed` is **measured, never scored**. A sealed fort that nobody can see into\nis already winning on the exposure counter; paying twice for it would break the\nexact zero sum the league ranks on.\n"
+          }
+        },
+        {
+          "id": "protocol.md",
+          "title": "Wire protocol",
+          "content": {
+            "type": "text",
+            "value": "# hide-and-seek wire protocol \u2014 Sprite v1 plus this game's extensions\n\nBoth the player endpoints (`/player`, POV observation streams) and the\nglobal/spectator endpoint speak\n[Sprite v1](https://github.com/Metta-AI/bitworld/blob/master/docs/sprite_v1.md).\nThis document lists everything hide-and-seek adds or changes relative to that\nbase document; anything not mentioned here matches Sprite v1 exactly. Game\nsemantics \u2014 mechanics, sprite labels, tuning defaults \u2014 live in\n[`RULES.md`](RULES.md), and the object layer in\n[`OBJECTS.md`](OBJECTS.md).\n\n**The forked-from note.** This file is coworld-ctf's `docs/PROTOCOL.md`,\nFORKED, not rewritten: the bit-7 row becomes the GRAB row, the `own aim`\nreadback marker and the frame-pacing / lobby-detection sections are kept\nverbatim, and the Player Ready warning is kept for the same reason the\nstarter carries it.\n\n## Player input: bit 7 is the C button \u2014 HOLD TO GRAB\n\nSprite v1 reserves player-input bit `7` (\"must be sent as 0\"). This game\nassigns it:\n\n| Bit | Value | Meaning |\n| ---: | ---: | --- |\n| `7` | `0x80` (128) | C button \u2014 HOLD to grab the object in reach, release to drop |\n\n`A` (`0x04`) is the LOCK / UNLOCK toggle, not a trigger: there are no weapons\nin this game. The d-pad is locomotion and never changes aim; `B` and `Select`\nrotate the aim counter-clockwise and clockwise at `aimTurnRate` brads/tick.\n\n**In league play a seat sends NO inputs at all.** The server computes every\nactuator mask from the seat's ORDER (see `RULES.md` \u00a7 The reply schema); the\ninput bits above are the wire the server writes into the replay, not a\nchannel a policy drives.\n\n## Player Ready (`0x85`) is supported \u2014 but do NOT send it in league play\n\nThe server understands the Sprite v1 Player Ready packet (`0x85`): after each\nrendered frame a player client may send it to signal \"done thinking\", which\nlets the server pace fast-mode games by readiness instead of the wall clock.\nSending it is optional; clients that never send it are paced by timeouts.\n\n**Warning (measured, not theoretical), kept from the starter:** on a\nwall-clock-paced server, sending ready every frame corrupts input-application\ntiming for a client that drives its own inputs, because its dead-reckoned aim\nrandom-walks between frames.\n\n**It is irrelevant here, and the seat registrar sends it deliberately.** A\nhide-and-seek seat sends no inputs at all \u2014 the server computes every mask \u2014\nso the dead-reckoning hazard cannot arise, `fastMode` is on in every shipped\nvariant, and `0x85` is what lets the server advance the tick as soon as every\nseat has acknowledged the frame.\n\n## Your own aim: read the `own aim` marker; dead-reckon between frames\n\nThe player stream carries an absolute readback of your own aim angle: an\ninvisible 1\u00d71 HUD marker labeled `own aim <brads>` (256 brads per turn,\n0 = east, counter-clockwise), stating your turret angle as of the rendered\ntick. Match the label by the `own aim ` prefix and parse the tail. (An\nearlier build's \"aim dot\" label was a previous form of this readback; the\nengine retired it, and between the two the observation carried none \u2014 bots\nfrom that era dead-reckon open-loop.)\n\nThe marker is exact only for the rendered tick, so a client still integrates\nbetween frames:\n\n- Spawn aim points into the room (hiders east, seekers west).\n- Each held rotate button turns the continuous aim by the server's\n  `aimTurnRate` (default 6 brads per tick, about 8.4 degrees) for **every elapsed\n  sim tick** \u2014 including ticks you\n  never saw a frame for. If you process frames with `frameAdvance > 1`\n  (see below), integrate the rotation across all advanced ticks, then let the\n  next frame's marker correct the estimate.\n- The grab probe reads the CURRENT aim: a `C` press binds the first object the\n  segment from the cog's centre along its aim meets inside `grabReach`, with the aim as of the tick it was compiled on.\n\n## Frame pacing: drain the backlog, act on the latest frame\n\nThe server keeps applying your **last sent input mask** on every sim tick,\nwhether or not you sent anything \u2014 inputs are level-based state, not events.\nIf your client falls behind the frame stream, acting on a stale frame means\nreacting to a world that has already moved on while your held buttons kept\napplying. The reference client drains the socket backlog each loop iteration\n(up to 128 buffered frames), decides on the **latest** frame only, and tracks\nhow many sim ticks elapsed since the previous decision (`frameAdvance`) so\ndead-reckoned state (like the aim, above) stays consistent. Only *changes* to\nthe input mask need to be sent.\n\n## Lobby and interstitial detection\n\nThere is no explicit \"game phase\" message on the player stream. The in-game\nsignal is the **map camera object** (object id `1`, sprite id `1`): while it\nis present, a match is running and its `(x, y)` is the camera anchor; the\nserver deletes it during the lobby and the game-over interstitial. The\nreference client treats \"map object deleted\" as leave-game (reset transient\nstate) and \"map object defined\" as enter-game. The walkability mask arrives\nas its own labeled sprite (see `RULES.md`) and is only valid in-game.\n\n## Observation render scale\n\n- **Player/POV streams are 1\u00d7 map resolution.** Object coordinates and sprite\n  pixel sizes are map pixels directly: an object's center\n  (`object.x + sprite.width / 2`, same for y) IS its map point on the\n  720x400 room. No divisor is needed.\n- **Only the global/spectator/replay stream supersamples**, shipping its\n  zoomable board layers at 2\u00d7 (`RenderScale`); its viewport announces the\n  scaled size. The sim, the gameHash, and every value quoted in `RULES.md`\n  stay in 1\u00d7 map pixels.\n## The replay records MASKS, not orders\n\nThe determinism boundary sits between the control layer and the sim: the\nserver records the per-tick actuator MASKS the control layer produced (plus\none `gameHash` per tick), and the static wasm viewer re-steps the SAME sim\nmodule from those masks and checks the hash every tick. Orders, prompts and\nLLM replies are never re-run at playback \u2014 they ride the chat stream as\nredacted CONTROL RECORDS (`register`, `directive`, `fallback`,\n`budget_guard`, `stop`, `result`) that drive the broadcast feed and can never\naffect the simulation. The one exception is `stop`, the load-bearing\nwall-clock / fault record: a wall-clock fact cannot be re-derived from sim\nstate, so it is written once and applied by the SAME proc on record and on\nplayback.\n"
+          }
+        }
+      ]
+    },
+    "config_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tokens",
+        "players"
+      ],
+      "properties": {
+        "tokens": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {
+            "type": "string"
+          },
+          "description": "RUNNER-INJECTED per-seat auth tokens. Never present in a shipped game_config; the runner supplies exactly one per seat."
+        },
+        "players": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ]
+          },
+          "description": "Per-seat display names."
+        },
+        "slots": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "team": {
+                "type": "string",
+                "enum": [
+                  "red",
+                  "blue"
+                ]
+              },
+              "color": {
+                "type": "string"
+              },
+              "token": {
+                "type": "string"
+              }
+            }
+          },
+          "description": "Per-seat side in GAME 1. Alternates red/blue, which deals slots 0/2/4 the hiding side; sides swap for game 2."
+        },
+        "seed": {
+          "type": "integer",
+          "description": "Episode seed. Picks the room (pool[seed mod 3]) and the object deal."
+        },
+        "num_agents": {
+          "type": "integer",
+          "description": "Seats. Exactly six: three hiders and three seekers.",
+          "minimum": 6,
+          "maximum": 6,
+          "default": 6
+        },
+        "roomPool": {
+          "type": "string",
+          "enum": [
+            "all",
+            "warren",
+            "atrium",
+            "long_hall"
+          ],
+          "default": "all",
+          "description": "Which committed rooms the seeded pick draws from."
+        },
+        "crates": {
+          "type": "integer",
+          "description": "Crates dealt (64x64).",
+          "minimum": 0,
+          "maximum": 6,
+          "default": 4
+        },
+        "panels": {
+          "type": "integer",
+          "description": "Panels dealt (128x32 or 32x128).",
+          "minimum": 0,
+          "maximum": 4,
+          "default": 2
+        },
+        "ramps": {
+          "type": "integer",
+          "description": "Ramps dealt (80x40 or 40x80).",
+          "minimum": 0,
+          "maximum": 3,
+          "default": 2
+        },
+        "turnTicks": {
+          "type": "integer",
+          "description": "Sim ticks per decision turn.",
+          "minimum": 1,
+          "default": 90
+        },
+        "prepTurns": {
+          "type": "integer",
+          "description": "Turns of the preparation phase, during which the seekers are frozen and blind.",
+          "minimum": 0,
+          "default": 4
+        },
+        "huntTurns": {
+          "type": "integer",
+          "description": "Turns of the hunt phase, during which exposure is scored.",
+          "minimum": 1,
+          "default": 8
+        },
+        "maxGames": {
+          "type": "integer",
+          "description": "Games per episode. Two, with the sides swapped between them.",
+          "minimum": 1,
+          "default": 2
+        },
+        "minPlayers": {
+          "type": "integer",
+          "description": "Seats required before the lobby starts.",
+          "minimum": 1,
+          "maximum": 6,
+          "default": 6
+        },
+        "sightRange": {
+          "type": "integer",
+          "description": "Vision cone reach, px.",
+          "minimum": 1,
+          "default": 340
+        },
+        "visionConeDeg": {
+          "type": "integer",
+          "description": "Vision cone HALF-angle, degrees.",
+          "minimum": 1,
+          "maximum": 180,
+          "default": 35
+        },
+        "visionBubble": {
+          "type": "integer",
+          "description": "Omnidirectional vision radius, px.",
+          "minimum": 0,
+          "default": 48
+        },
+        "aimTurnRate": {
+          "type": "integer",
+          "description": "Brads per tick a held rotate button turns the aim.",
+          "minimum": 1,
+          "default": 6
+        },
+        "carrySpeedPct": {
+          "type": "integer",
+          "description": "A holder's max speed, percent of normal.",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 55
+        },
+        "grabReach": {
+          "type": "integer",
+          "description": "How far past the body edge the grab probe reaches, px.",
+          "minimum": 1,
+          "default": 30
+        },
+        "lockReach": {
+          "type": "integer",
+          "description": "How close an object must be to be locked, px.",
+          "minimum": 1,
+          "default": 30
+        },
+        "vaultSpanPx": {
+          "type": "integer",
+          "description": "Thickest barrier a ramp can carry a cog over, px.",
+          "minimum": 1,
+          "default": 112
+        },
+        "vaultTicks": {
+          "type": "integer",
+          "description": "Airborne ticks of one vault.",
+          "minimum": 1,
+          "default": 10
+        },
+        "keepClearPx": {
+          "type": "integer",
+          "description": "No object may be moved this close to a seeker pad, px.",
+          "minimum": 0,
+          "default": 96
+        },
+        "attempt1Ms": {
+          "type": "integer",
+          "description": "First parallel batch deadline, ms.",
+          "minimum": 1000,
+          "default": 7000
+        },
+        "retryMs": {
+          "type": "integer",
+          "description": "Single retry batch deadline, ms.",
+          "minimum": 0,
+          "default": 3000
+        },
+        "turnBudgetMs": {
+          "type": "integer",
+          "description": "Monotonic cap around one whole turn, ms.",
+          "minimum": 1000,
+          "default": 16000
+        },
+        "turnSpacingMs": {
+          "type": "integer",
+          "description": "Wall-clock floor between consecutive batch STARTS, ms.",
+          "minimum": 0,
+          "default": 13000
+        },
+        "wallClockBudgetSeconds": {
+          "type": "integer",
+          "description": "Engine hard stop. Must be <= 660 so the episode settles inside 60% of the platform timeout.",
+          "minimum": 1,
+          "maximum": 660,
+          "default": 660
+        },
+        "lobbyJoinTimeoutTicks": {
+          "type": "integer",
+          "description": "Lobby ticks to wait for a short roster before declaring the missing seat.",
+          "minimum": 0,
+          "default": 2400
+        },
+        "gameOverTicks": {
+          "type": "integer",
+          "description": "Display hold after a game ends, ticks.",
+          "minimum": 0,
+          "default": 240
+        },
+        "startWaitTicks": {
+          "type": "integer",
+          "description": "Lobby countdown once the roster is full, ticks.",
+          "minimum": 0,
+          "default": 120
+        },
+        "fastMode": {
+          "type": "boolean",
+          "default": true,
+          "description": "Advance frames as soon as every seat has acknowledged; pacing only, never in gameHash."
+        },
+        "showPlayerLabels": {
+          "type": "boolean",
+          "default": false,
+          "description": "Always false: no in-board sprite may leak a policy identity."
+        },
+        "mapSpec": {
+          "type": "object",
+          "description": "The resolved room document. Pinned into every replay so a later edit to data/rooms/*.json cannot change what an old replay renders."
+        }
+      }
+    },
+    "results_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "names",
+        "aliases",
+        "team",
+        "scores",
+        "win",
+        "reason",
+        "endRule",
+        "games"
+      ],
+      "properties": {
+        "names": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 6,
+          "maxItems": 6
+        },
+        "aliases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 6,
+          "maxItems": 6
+        },
+        "team": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "hiders",
+              "seekers"
+            ]
+          },
+          "minItems": 6,
+          "maxItems": 6
+        },
+        "scores": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 6,
+          "maxItems": 6
+        },
+        "win": {
+          "type": "array",
+          "items": {
+            "type": "boolean"
+          },
+          "minItems": 6,
+          "maxItems": 6
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "complete",
+            "deadline",
+            "fault"
+          ]
+        },
+        "endRule": {
+          "type": "string",
+          "enum": [
+            "full_time",
+            "wall_clock",
+            "sim_fault",
+            "host_error"
+          ]
+        },
+        "games": {
+          "type": "integer"
+        },
+        "gameMargins": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "hiddenTicks": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "seenTicks": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "huntTicksPlayed": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "seatSeenTicks": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 6,
+          "maxItems": 6
+        },
+        "sealedTicks": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 6,
+          "maxItems": 6
+        },
+        "grabs": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 6,
+          "maxItems": 6
+        },
+        "pushedPx": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 6,
+          "maxItems": 6
+        },
+        "locks": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 6,
+          "maxItems": 6
+        },
+        "vaults": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 6,
+          "maxItems": 6
+        },
+        "shouts": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 6,
+          "maxItems": 6
+        },
+        "room": {
+          "type": "string"
+        },
+        "policyKinds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "llm",
+              "scripted"
+            ]
+          },
+          "minItems": 6,
+          "maxItems": 6
+        },
+        "crossPlay": {
+          "type": "boolean"
+        },
+        "llmTurns": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 6,
+          "maxItems": 6
+        },
+        "fallbackTurns": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 6,
+          "maxItems": 6
+        },
+        "ordersRejected": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 6,
+          "maxItems": 6
+        },
+        "deadSeats": {
+          "type": "array",
+          "items": {
+            "type": "boolean"
+          },
+          "minItems": 6,
+          "maxItems": 6
+        },
+        "finalTick": {
+          "type": "integer"
+        },
+        "seed": {
+          "type": "integer"
+        },
+        "stopDetail": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "player": [
+    {
+      "id": "burrow",
+      "type": "player",
+      "name": "burrow",
+      "description": "The published scripted baseline: walls a doorway with the nearest panel or crate, LOCKS what it placed, drags the ramps to a far corner and locks them there, then hides in a pocket facing the door. As a seeker it sweeps the patrol ring, shoves unlocked furniture aside and vaults a locked wall. It is also the server-side fallback when an LLM seat fails twice.",
+      "image": "{{HIDE_AND_SEEK_IMAGE}}",
+      "run": [
+        "/bin/hide-and-seek-player"
+      ],
+      "source_url": "https://github.com/Metta-AI/cogame-hide-and-seek/blob/main/src/hns/baselines.nim",
+      "env": {
+        "PLAYER_SCRIPTED": "burrow",
+        "PLAYER_POLICY_LABEL": "burrow"
+      },
+      "resources": {
+        "requests": {
+          "cpu": "200m",
+          "memory": "128Mi"
+        },
+        "limits": {
+          "cpu": "1"
+        }
+      }
+    },
+    {
+      "id": "scatter",
+      "type": "player",
+      "name": "scatter",
+      "description": "The weaker baseline, different in SHAPE rather than in degree: it never touches the furniture. As a hider it alternates between the two pockets furthest from the seeker pads and runs when a seeker is known within 180 px; as a seeker it walks a third of the patrol ring and chases what it sees.",
+      "image": "{{HIDE_AND_SEEK_IMAGE}}",
+      "run": [
+        "/bin/hide-and-seek-player"
+      ],
+      "source_url": "https://github.com/Metta-AI/cogame-hide-and-seek/blob/main/src/hns/baselines.nim",
+      "env": {
+        "PLAYER_SCRIPTED": "scatter",
+        "PLAYER_POLICY_LABEL": "scatter"
+      },
+      "resources": {
+        "requests": {
+          "cpu": "200m",
+          "memory": "128Mi"
+        },
+        "limits": {
+          "cpu": "1"
+        }
+      }
+    }
+  ],
+  "variants": [
+    {
+      "id": "warren",
+      "name": "Three rooms (3 hiders v 3 seekers, seeded room)",
+      "description": "Six cogs in a 720x400 room drawn from three seeded layouts. Three hiders get fifteen seconds alone with four crates, two panels and two ramps: drag them, wall a doorway, lock what you built, and drag the ramps out of reach. Then three seekers walk in with 70-degree torch cones and thirty seconds. Every tick any hider is inside any cone pays the seekers; every tick all three are unseen pays the hiders. Then the trios swap sides and play the same room again.",
+      "game_config": {
+        "players": [
+          {
+            "name": "Cog1"
+          },
+          {
+            "name": "Cog2"
+          },
+          {
+            "name": "Cog3"
+          },
+          {
+            "name": "Cog4"
+          },
+          {
+            "name": "Cog5"
+          },
+          {
+            "name": "Cog6"
+          }
+        ],
+        "slots": [
+          {
+            "team": "red"
+          },
+          {
+            "team": "blue"
+          },
+          {
+            "team": "red"
+          },
+          {
+            "team": "blue"
+          },
+          {
+            "team": "red"
+          },
+          {
+            "team": "blue"
+          }
+        ],
+        "num_agents": 6,
+        "minPlayers": 6,
+        "roomPool": "all",
+        "crates": 4,
+        "panels": 2,
+        "ramps": 2,
+        "turnTicks": 90,
+        "prepTurns": 4,
+        "huntTurns": 8,
+        "maxGames": 2,
+        "sightRange": 340,
+        "visionConeDeg": 35,
+        "visionBubble": 48,
+        "aimTurnRate": 6,
+        "carrySpeedPct": 55,
+        "grabReach": 30,
+        "lockReach": 30,
+        "vaultSpanPx": 112,
+        "vaultTicks": 10,
+        "keepClearPx": 96,
+        "attempt1Ms": 7000,
+        "retryMs": 3000,
+        "turnBudgetMs": 16000,
+        "turnSpacingMs": 13000,
+        "wallClockBudgetSeconds": 660,
+        "lobbyJoinTimeoutTicks": 2400,
+        "startWaitTicks": 120,
+        "gameOverTicks": 240,
+        "fastMode": true,
+        "showPlayerLabels": false
+      }
+    },
+    {
+      "id": "long-hall",
+      "name": "The long hall (nothing to hide behind until you build it)",
+      "description": "One open hall, two stub walls, and six crates, three panels and two ramps. There is no pocket to sit in: a hider who does not build has nowhere to be. Prep runs six turns instead of four, so a trio that can plan a wall, lock it and hide the ramps has time to do it - and a trio that cannot is visible for thirty straight seconds. Sides swap and the hall is played again.",
+      "game_config": {
+        "players": [
+          {
+            "name": "Cog1"
+          },
+          {
+            "name": "Cog2"
+          },
+          {
+            "name": "Cog3"
+          },
+          {
+            "name": "Cog4"
+          },
+          {
+            "name": "Cog5"
+          },
+          {
+            "name": "Cog6"
+          }
+        ],
+        "slots": [
+          {
+            "team": "red"
+          },
+          {
+            "team": "blue"
+          },
+          {
+            "team": "red"
+          },
+          {
+            "team": "blue"
+          },
+          {
+            "team": "red"
+          },
+          {
+            "team": "blue"
+          }
+        ],
+        "num_agents": 6,
+        "minPlayers": 6,
+        "roomPool": "long_hall",
+        "crates": 6,
+        "panels": 3,
+        "ramps": 2,
+        "turnTicks": 90,
+        "prepTurns": 6,
+        "huntTurns": 8,
+        "maxGames": 2,
+        "sightRange": 380,
+        "visionConeDeg": 35,
+        "visionBubble": 48,
+        "aimTurnRate": 6,
+        "carrySpeedPct": 55,
+        "grabReach": 30,
+        "lockReach": 30,
+        "vaultSpanPx": 112,
+        "vaultTicks": 10,
+        "keepClearPx": 96,
+        "attempt1Ms": 7000,
+        "retryMs": 3000,
+        "turnBudgetMs": 16000,
+        "turnSpacingMs": 13000,
+        "wallClockBudgetSeconds": 660,
+        "lobbyJoinTimeoutTicks": 2400,
+        "startWaitTicks": 120,
+        "gameOverTicks": 240,
+        "fastMode": true,
+        "showPlayerLabels": false
+      }
+    }
+  ],
+  "certification": {
+    "players": [
+      {
+        "player_id": "burrow"
+      },
+      {
+        "player_id": "scatter"
+      },
+      {
+        "player_id": "burrow"
+      },
+      {
+        "player_id": "scatter"
+      },
+      {
+        "player_id": "burrow"
+      },
+      {
+        "player_id": "scatter"
+      }
+    ],
+    "game_config": {
+      "players": [
+        {
+          "name": "Cog1"
+        },
+        {
+          "name": "Cog2"
+        },
+        {
+          "name": "Cog3"
+        },
+        {
+          "name": "Cog4"
+        },
+        {
+          "name": "Cog5"
+        },
+        {
+          "name": "Cog6"
+        }
+      ],
+      "slots": [
+        {
+          "team": "red"
+        },
+        {
+          "team": "blue"
+        },
+        {
+          "team": "red"
+        },
+        {
+          "team": "blue"
+        },
+        {
+          "team": "red"
+        },
+        {
+          "team": "blue"
+        }
+      ],
+      "num_agents": 6,
+      "minPlayers": 6,
+      "roomPool": "warren",
+      "crates": 4,
+      "panels": 2,
+      "ramps": 2,
+      "turnTicks": 90,
+      "prepTurns": 2,
+      "huntTurns": 3,
+      "maxGames": 2,
+      "sightRange": 340,
+      "visionConeDeg": 35,
+      "visionBubble": 48,
+      "aimTurnRate": 6,
+      "carrySpeedPct": 55,
+      "grabReach": 30,
+      "lockReach": 30,
+      "vaultSpanPx": 112,
+      "vaultTicks": 10,
+      "keepClearPx": 96,
+      "attempt1Ms": 7000,
+      "retryMs": 3000,
+      "turnBudgetMs": 16000,
+      "turnSpacingMs": 0,
+      "wallClockBudgetSeconds": 240,
+      "lobbyJoinTimeoutTicks": 600,
+      "startWaitTicks": 0,
+      "gameOverTicks": 24,
+      "fastMode": true,
+      "showPlayerLabels": false,
+      "seed": 42
+    }
+  }
+}
