@@ -2106,28 +2106,19 @@ body[data-noviewpanel] #viewpanel { display: none !important; }
     return team === 'red' ? (o.redLives || 0) : team === 'blue' ? (o.blueLives || 0) : 0;
   }
 
-  function endcardWinCondition(o, teams) {
+  function endcardWinCondition(o) {
     // The condition CHIP: how the match ended, in two or three words.
-    // (A time-limit ending is always a draw in the current rules — the sim's
-    // checkMaxTicks path never crowns a winner — so timeLimit only pairs
-    // with draw here.)
-    if (o.endRule !== undefined) {
-      // PAINTBALL names the RULE the server actually applied, so the chip can
-      // never disagree with the endRule in results.json.
-      switch (o.endRule) {
-        case 'wipe': return o.draw ? 'MUTUAL WIPE' : 'WIPE';
-        case 'mercy': return 'MERCY — LEAD BEYOND THE CLOCK';
-        case 'wall_clock': return 'WALL-CLOCK STOP';
-        case 'sim_fault':
-        case 'host_error': return 'FAULT — NO RESULT';
-        default: return o.draw ? 'FULL TIME — DEAD EVEN' : 'FULL TIME ON THE HILL';
-      }
+    // The chip names the RULE the server actually applied, so it can never
+    // disagree with the endRule in results.json. This game has exactly four
+    // rules (sim_types.nim): full_time, wall_clock, sim_fault, host_error.
+    switch (o.endRule) {
+      case 'wall_clock': return 'WALL-CLOCK STOP';
+      case 'sim_fault':
+      case 'host_error': return 'FAULT — NO RESULT';
+      default: return o.draw
+        ? 'BOTH SIDES — DEAD EVEN'
+        : 'BOTH SIDES HIDDEN — EXPOSURE DECIDED';
     }
-    if (o.draw) return o.timeLimit ? 'TIME LIMIT — DRAW' : 'DRAW';
-    var losers = teams.filter(function (t) { return t !== o.winner; });
-    var bestLoser = 0;
-    losers.forEach(function (t) { bestLoser = Math.max(bestLoser, overLives(o, t)); });
-    return bestLoser <= 0 ? 'ELIMINATION' : 'HEART CAPTURE';
   }
 
   function endcardOrder(a, b) {
@@ -2296,7 +2287,7 @@ body[data-noviewpanel] #viewpanel { display: none !important; }
     card._key = key;
 
     var head = $('ec-headline'), how = $('ec-how');
-    $('ec-wincond').textContent = endcardWinCondition(o, teams);
+    $('ec-wincond').textContent = endcardWinCondition(o);
 
     // MVP: the winning team's best final line (kills > fewer deaths >
     // captures — the capturer keeps their ⚑ mark, the star follows the guns).

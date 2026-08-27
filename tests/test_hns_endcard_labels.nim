@@ -36,7 +36,8 @@ const Forbidden = [
   "Lives left", "LIVES LEAD", "Clstr", "Hill time",
   "Filling hoppers with fresh paint", "In the locker room",
   "kills / flag story / winner", "hill coverage", "Hill coverage",
-  "tags \u00B7", "paint pods", "banked hill time", "WIPES THE FIELD"
+  "tags \u00B7", "paint pods", "banked hill time", "WIPES THE FIELD",
+  "ON THE HILL", "MUTUAL WIPE", "HEART CAPTURE", "MERCY \u2014 LEAD"
 ]
   ## The user-visible strings a fork of this page ships by accident. Each one
   ## is a sentence a spectator would read, not an identifier: the inherited
@@ -58,7 +59,9 @@ const Required = [
   ("Before the door opens", "the clock's re-mapped caption"),
   ("Replay hash mismatch", "the integrity warning"),
   ("sightings / locks / vaults on the timeline",
-   "the spoilers button's re-mapped title")
+   "the spoilers button's re-mapped title"),
+  ("'BOTH SIDES HIDDEN \u2014 EXPOSURE DECIDED'",
+   "the endcard's re-mapped win-condition chip")
 ]
 
 block noPaintbotVocabularySurvives:

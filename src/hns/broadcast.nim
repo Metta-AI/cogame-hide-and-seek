@@ -9,7 +9,7 @@
 ## `tests/test_hns_events.nim` asserts the emitted set equals it exactly.
 
 import
-  std/[json, strutils],
+  std/[json, sets, strutils],
   sim, global
 
 const BroadcastEventKinds*: array[20, string] = [
@@ -292,6 +292,7 @@ proc teamsJson(sim: SimServer): JsonNode =
       sealedCogs = 0
       locked = sim.lockedCount(lockOwnerFor(team))
       names = newJArray()
+      seenPolicies = initHashSet[string]()
     for player in sim.players:
       if player.team != team:
         continue
@@ -303,7 +304,12 @@ proc teamsJson(sim: SimServer): JsonNode =
       let index = sim.playerIndexForSlot(slot)
       if index >= 0 and sim.players[index].team == team and
           slot < sim.seatNames.len:
-        names.add(%sim.seatNames[slot])
+        # DISTINCT policy identities, in join-slot order: the chrome headlines
+        # a side with this list and prints one end-card group per entry, so a
+        # side seating one policy across three seats must contribute one name.
+        let policy = policyName(sim.seatNames[slot])
+        if policy.len > 0 and not seenPolicies.containsOrIncl(policy):
+          names.add(%policy)
     result[teamText(team)] = %*{
       "role": roleText(team),
       "seen": seen,
