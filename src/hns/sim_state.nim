@@ -11,7 +11,7 @@
 
 import
   std/[json, random, strutils],
-  sim_types, room, sim_config
+  sim_types, room
 
 proc lobbyIsStarting*(sim: SimServer): bool =
   sim.phase == Lobby and sim.players.len >= sim.config.minPlayers

@@ -15,7 +15,6 @@
 import
   std/[math, random],
   bitworld/pixelfonts,
-  bitworld/server,
   pixie
 
 const

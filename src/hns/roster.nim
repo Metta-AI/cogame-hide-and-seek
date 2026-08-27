@@ -15,8 +15,8 @@
 ##    `tools/ci/docker_smoke.sh`'s expected-key set in the same commit.
 
 import
-  std/[json, strutils],
-  sim_types, sim_config, sim_state, room, phase
+  std/json,
+  sim_types, sim_state, room, phase
 
 const IdentityNames* = [
   "alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta"]

@@ -10,7 +10,7 @@
 ## INTEGER ONLY (`tests/test_hns_determinism.nim`).
 
 import
-  sim_types, sim_config, sim_state, vision
+  sim_types, sim_config, vision
 
 proc sideOf*(slot, gameIndex: int): Team {.inline.} =
   ## Sides are dealt by SLOT PARITY and swap between the episode's two games.

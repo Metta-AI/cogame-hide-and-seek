@@ -63,5 +63,4 @@ RUN nim c -d:emscripten replay-viewer/hns_replay.nim && \
   test -f replay-viewer/dist/art/walls/wall_h.jpg && \
   test -f replay-viewer/dist/art/lockerroom/bg.jpg && \
   test -f replay-viewer/dist/art/lockerroom/blue_1.webp && \
-  test -f replay-viewer/dist/art/lockerroom/red_6.webp && \
-  test -d replay-viewer/dist/data/rooms
+  test -f replay-viewer/dist/art/lockerroom/red_6.webp

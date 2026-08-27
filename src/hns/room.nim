@@ -16,7 +16,7 @@
 ## a later edit to a committed room cannot change what an old replay renders.
 
 import
-  std/[json, os, strutils, tables],
+  std/[json, os, tables],
   sim_types
 
 const

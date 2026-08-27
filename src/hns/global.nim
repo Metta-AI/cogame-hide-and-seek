@@ -23,7 +23,6 @@
 
 import
   std/[math, strutils, tables],
-  supersnappy,
   bitworld/pixelfonts, bitworld/spriteprotocol,
   pixie,
   labels, sim

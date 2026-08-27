@@ -11,7 +11,7 @@
 ## INTEGER ONLY (`tests/test_hns_determinism.nim`).
 
 import
-  sim_types, sim_state, objects
+  sim_types, sim_state
 
 proc hiderLockedMask(sim: SimServer): seq[bool] =
   ## The fov-grid cells a hider-locked object makes impassable, on the same
