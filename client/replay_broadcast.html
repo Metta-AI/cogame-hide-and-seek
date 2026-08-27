@@ -1300,6 +1300,56 @@ body[data-noviewpanel] #viewpanel { display: none !important; }
   var canvas = $('board');
   var statusEl = $('status');
 
+  // ---- the two tempo levers, and the beat pause (the starter's) ------------
+  // (1) ANIM_MAX_FACTOR caps chrome beat ANIMATIONS so a feed row still slides
+  //     in at a readable rate at 16x. (2) DWELL_FLOOR_MS floors a beat's
+  //     on-screen HOLD in wall-clock time, collapsing only the dead time
+  //     between contacts. These are NOT one knob — one caps motion, one floors
+  //     dwell.
+  var ANIM_MAX_FACTOR = 2;
+  var DWELL_FLOOR_MS = { feed: 2600, banner: 1900, curtain: 2400, read: 600 };
+  function animFactor() {
+    var sp = (lastState && lastState.sp) || 1;
+    return Math.min(sp, ANIM_MAX_FACTOR);
+  }
+  function dwellFloor(kind) {
+    return DWELL_FLOOR_MS[kind] || DWELL_FLOOR_MS.read;
+  }
+  // Freeze the chrome's ambient life the instant a beat lands, so idle motion
+  // never competes with a sighting or a lock. The board's own 24 Hz is never
+  // touched.
+  var beatPulseTimer = null;
+  function beatPulse() {
+    stage.classList.add('beat-active');
+    if (beatPulseTimer) clearTimeout(beatPulseTimer);
+    beatPulseTimer = setTimeout(function () {
+      stage.classList.remove('beat-active');
+      beatPulseTimer = null;
+    }, dwellFloor('read'));
+  }
+
+  // ---- the view --------------------------------------------------------
+  // #viewpanel (the zoom bar and the minimap) is DELETED: the board is a fixed
+  // 720x400 room with no off-frame area, so relayout() letterboxes it whole at
+  // every width and there is never a "which part am I holding" question to
+  // answer. What survives is the arrow-key pan cell, because the core still
+  // owns a transform, and a no-op syncViewUi so the core's onTransform /
+  // onFirstFrame callbacks keep their contract.
+  var PAN_CELL_MAP_PX = 64;
+  function panCellBoardPx() {
+    // The view is measured in BOARD pixels and a cell is defined in WORLD
+    // pixels; the two differ by the board's supersample factor, which the
+    // server states per frame as `bs`.
+    var bs = lastState && lastState.bs > 0 ? lastState.bs : 1;
+    return PAN_CELL_MAP_PX * bs;
+  }
+  function syncViewUi(t) {
+    // Nothing to sync: the zoom cluster and the minimap are gone with
+    // #viewpanel. Kept as the core's callback target so a transform landing
+    // before (or after) the wiring is never an error.
+    return t;
+  }
+
   // ---- pre-load curtain: the bot locker room -------------------------------
   // The stage opens on this scene (see #lockerroom CSS) while the socket /
   // wasm sim boots. The art frames are wired here (their base path is
@@ -1326,26 +1376,23 @@ body[data-noviewpanel] #viewpanel { display: none !important; }
     // pose — all in % of the 992x926 plate, so everything scales together.
     // Distinct cycle lengths keep the four carousels out of phase; the
     // composed scene state repeats only every few minutes.
+    // Two bots only: the green and yellow plates went with four-team play,
+    // and requesting webps the bundle does not ship is ten 404s on every
+    // load. ax/ay anchor each bot's bottom-centre on the plate, w/h size each
+    // pose — all in % of the 992x926 plate — and the two cycle lengths stay
+    // coprime so the pair never falls into lockstep.
     var LK_BOTS = {
-      green:  { ax: 22.83, ay: 76.67, cyc: 4.6,
-        poses: [{ f: 1, w: 14.82, h: 18.03 }, { f: 2, w: 14.92, h: 18.25 },
-                { f: 3, w: 14.62, h: 18.14 }, { f: 5, w: 14.82, h: 18.25 },
-                { f: 6, w: 14.62, h: 19.01 }] },
       blue:   { ax: 41.08, ay: 76.67, cyc: 3.8,
         poses: [{ f: 1, w: 16.63, h: 18.25 }, { f: 2, w: 14.92, h: 21.6 },
                 { f: 3, w: 15.83, h: 21.81 }, { f: 5, w: 16.63, h: 20.63 },
                 { f: 6, w: 14.62, h: 22.68 }] },
-      yellow: { ax: 59.93, ay: 76.78, cyc: 5.2,
-        poses: [{ f: 1, w: 16.43, h: 18.57 }, { f: 2, w: 15.52, h: 18.57 },
-                { f: 3, w: 15.62, h: 18.57 }, { f: 5, w: 16.13, h: 18.36 },
-                { f: 6, w: 15.83, h: 23.11 }] },
       red:    { ax: 79.03, ay: 77.43, cyc: 4.1,
         poses: [{ f: 1, w: 18.15, h: 18.79 }, { f: 2, w: 15.93, h: 20.19 },
                 { f: 3, w: 15.52, h: 19.87 }, { f: 5, w: 15.83, h: 20.63 },
                 { f: 6, w: 16.73, h: 21.06 }] }
     };
     var spritesEl = $('lk-sprites');
-    ['green', 'blue', 'yellow', 'red'].forEach(function (bot) {
+    ['blue', 'red'].forEach(function (bot) {
       var b = LK_BOTS[bot];
       var maxW = 0, maxH = 0;
       b.poses.forEach(function (p) {
