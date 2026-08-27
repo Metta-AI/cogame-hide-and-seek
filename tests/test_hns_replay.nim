@@ -3,6 +3,12 @@
 ## UTF-8 JSON with every capped field filled to its cap.
 
 import std/[json, os, osproc, strutils, unicode]
+
+proc scratch(name: string): string =
+  ## A path nothing else in the suite can be holding: `tests.nim` runs every
+  ## module in ONE process and CI runs every file twice, so a fixed temp name
+  ## is a recording two runs can share.
+  getTempDir() / ("hns-" & name & "-" & $getCurrentProcessId() & ".replay")
 import helpers
 import hns/[sim_types, replays, replay_runtime, directives, decide]
 import test_hns_engine_support
@@ -18,7 +24,7 @@ proc reDerive(path: string): tuple[sim: SimServer, mismatch: int] =
   (game, player.hashMismatchTick)
 
 block recordThenReDeriveFullTime:
-  let path = getTempDir() / "hns-full-time.replay"
+  let path = scratch("full-time")
   let recorded = recordEpisode(path)
   let (played, mismatch) = reDerive(path)
   check mismatch < 0,
@@ -33,7 +39,7 @@ block recordThenReDeriveWallClock:
   ## THE LOAD-BEARING STOP. A wall-clock fact cannot be re-derived from sim
   ## state, so it is written as one record and applied by the SAME proc on
   ## record and on playback (the particle-worlds 13c66d7 scar).
-  let path = getTempDir() / "hns-wall-clock.replay"
+  let path = scratch("wall-clock")
   var stopped = recordEpisodeWithStop(path, EndRuleWallClock, 300)
   let (played, mismatch) = reDerive(path)
   check mismatch < 0, "the wall_clock replay diverged at tick " & $mismatch
@@ -45,7 +51,7 @@ block recordThenReDeriveWallClock:
     "a stopped episode is not rankable after playback"
 
 block recordThenReDeriveSimFault:
-  let path = getTempDir() / "hns-sim-fault.replay"
+  let path = scratch("sim-fault")
   var stopped = recordEpisodeWithStop(path, EndRuleSimFault, 260)
   let (played, mismatch) = reDerive(path)
   check mismatch < 0, "the sim_fault replay diverged at tick " & $mismatch
@@ -55,7 +61,7 @@ block recordThenReDeriveSimFault:
     "playback did not re-derive `sim_fault`, it read " & played.endRule
 
 block theBytesAreSelfSufficient:
-  let path = getTempDir() / "hns-self-sufficient.replay"
+  let path = scratch("self-sufficient")
   discard recordEpisode(path)
   let data = loadReplay(path)
   let config = parseJson(data.configJson)
@@ -87,7 +93,7 @@ block replaySummaryIsStrictUtf8Json:
     radio.add(Emoji)
   for i in 0 ..< MaxNoteRunes:
     notes.add(Emoji)
-  let path = getTempDir() / "hns-summary.replay"
+  let path = scratch("summary")
   var game = newTestSim()
   game.seatAll()
   game.startGame()
@@ -119,7 +125,12 @@ block replaySummaryIsStrictUtf8Json:
   let summary = parseJson(outcome.output)
   check summary{"protocol"}.getStr() == "hide-and-seek/v1",
     "the summary's protocol is " & summary{"protocol"}.getStr()
-  check summary{"orders"}.len == 6, "the summary lost the orders"
+  check summary{"orders"}.len == 6,
+    "the summary reports " & $summary{"orders"}.len & " orders, " &
+    $summary{"policyKinds"}.len & " policy kinds and " &
+    $summary{"radio"}.len & " radio lines; replay is " &
+    $getFileSize(path) & " bytes. Output head: " &
+    outcome.output[0 ..< min(600, outcome.output.len)]
   check summary{"radio"}.len == 6, "the summary lost the radio lines"
   check summary{"policyKinds"}.len == 6, "the summary lost the policy kinds"
   check summary{"results"}{"reason"}.getStr().len > 0,
