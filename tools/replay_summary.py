@@ -18,16 +18,17 @@ wasm_replay_smoke.cjs — the machinery this fork exists to reuse.
 
 How it reads the file WITHOUT a decoder for the whole record stream:
 
-* the header is ASCII up to the config JSON, so the config is recovered by
-  BRACE-MATCHING from the first `{` (the technique the starter's AGENTS.md
-  documents for prod forensics);
+* the config JSON is recovered by BRACE-MATCHING (the technique the starter's
+  AGENTS.md documents for prod forensics), trying each `{` in turn because the
+  header's timestamp and length prefixes are binary and can hold a `{` byte;
 * the CONTROL records — `register`, `directive`, `fallback`,
   `budget_guard`, `result` — are UTF-8 JSON objects embedded verbatim in the
   chat records, so they are recovered the same way, by scanning the remaining
   bytes for balanced `{"k":...}` objects.
 
-Nothing here needs the record framing, so it cannot drift when the framing
-changes; it only needs the two things that are text.
+Nothing here reads the RECORD framing, so it cannot drift when the record
+framing changes; the fixed header prefix is read only to recover the
+gameVersion, the one field with no self-describing text around it.
 """
 
 from __future__ import annotations
@@ -73,37 +74,56 @@ def brace_match(data: bytes, start: int) -> tuple[dict | None, int]:
     return None, len(data)
 
 
+def find_config(data: bytes) -> tuple[dict, int]:
+    """Recover the header's config object, and the index just past it.
+
+    The bytes BEFORE the config are not all text: the header carries a
+    wall-clock millisecond `u64` and two `u16` length prefixes, so roughly one
+    recording in a hundred has a `{` (0x7B) inside one of them. Brace-matching
+    from the FIRST `{` in the file then starts inside binary, runs off the end
+    of the record stream and reports an empty replay. So try each candidate in
+    turn and take the first that decodes to the config we recognise.
+    """
+    start = 0
+    while True:
+        at = data.find(b"{", start)
+        if at < 0:
+            return {}, 0
+        obj, end = brace_match(data, at)
+        if isinstance(obj, dict) and (
+                "num_agents" in obj or "seed" in obj or "players" in obj):
+            return obj, end
+        start = at + 1
+
+
+def read_game_version(data: bytes) -> str:
+    """Read the header's gameVersion string.
+
+    The one place the framing IS read, because it is the one field with no
+    self-describing text around it: `magic(8) + formatVersion(u16) +
+    len(u16)+gameName + len(u16)+gameVersion`. Scanning for a digit run
+    instead would append whatever byte of the following wall-clock timestamp
+    happens to be an ASCII digit ("1" reading as "18").
+    """
+    if not data.startswith(b"COWLDHNS"):
+        return ""
+    at = 8 + 2
+    field = b""
+    for _ in range(2):
+        if at + 2 > len(data):
+            return ""
+        size = int.from_bytes(data[at:at + 2], "little")
+        at += 2
+        field = data[at:at + size]
+        at += size
+    return field.decode("utf-8", "replace")
+
+
 def summarise(path: str) -> dict:
     data = open(path, "rb").read()
-    header = data[:64]
     protocol = "hide-and-seek/v1"
-    game_version = ""
-    # The header is `magic + format version + gameName + gameVersion` before the
-    # config; recover the version as the ASCII run right after the game name.
-    try:
-        head_text = header.decode("latin-1")
-        # Split AFTER the magic ("COWLDHNS" itself ends in the game name), so
-        # the digit scan runs from the gameName+gameVersion region.
-        if "COWLDHNS" in head_text:
-            head_text = head_text.split("COWLDHNS", 1)[1]
-        if "hide-and-seek" in head_text:
-            tail = head_text.split("hide-and-seek", 1)[1]
-            digits = ""
-            for ch in tail:
-                if ch.isdigit():
-                    digits += ch
-                elif digits:
-                    break
-            game_version = digits
-    except Exception:                                   # noqa: BLE001
-        pass
-
-    first = data.find(b"{")
-    config: dict = {}
-    cursor = 0
-    if first >= 0:
-        config, cursor = brace_match(data, first)
-        config = config or {}
+    game_version = read_game_version(data)
+    config, cursor = find_config(data)
 
     directives: list[dict] = []
     fallbacks = 0

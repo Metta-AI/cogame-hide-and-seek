@@ -139,6 +139,35 @@ block replaySummaryIsStrictUtf8Json:
     check line.getStr().runeLen == MaxRadioRunes,
       "a radio line was not exactly at its rune cap after the round trip"
 
+block theSummarySurvivesABraceInTheBinaryHeader:
+  ## The header writes a wall-clock millisecond `u64` and two `u16` length
+  ## prefixes BEFORE the config, so about one recording in a hundred carries a
+  ## literal `{` (0x7B) inside binary — and a summary that brace-matched from
+  ## the first `{` in the file then ran off the end and reported an empty
+  ## replay (CI run 33124948568). Reproduce it exactly: plant the byte.
+  let source = scratch("brace-source")
+  discard recordEpisode(source)
+  var bytes = readFile(source)
+  let configStart = bytes.find("{\"")
+  check configStart > 8, "no config object in the recorded header"
+  # `configStart - 3` is the last byte of the timestamp `u64`, one byte ahead
+  # of the config string's own length prefix.
+  bytes[configStart - 3] = '{'
+  let planted = scratch("brace-planted")
+  writeFile(planted, bytes)
+  let outcome = execCmdEx("python3 tools/replay_summary.py " & quoteShell(planted))
+  check outcome.exitCode == 0,
+    "replay_summary.py exited " & $outcome.exitCode & ": " & outcome.output
+  let summary = parseJson(outcome.output)
+  check summary{"names"}.len == 6,
+    "a `{` in the header lost the config: " &
+    outcome.output[0 ..< min(400, outcome.output.len)]
+  check summary{"results"}{"reason"}.getStr().len > 0,
+    "a `{` in the header lost the records"
+  check summary{"gameVersion"}.getStr() == GameVersion,
+    "the summary read the game version as \"" &
+    summary{"gameVersion"}.getStr() & "\", not \"" & GameVersion & "\""
+
 block everyCommittedFixtureCarriesTheCurrentGameVersion:
   ## The starter's sweep, kept: a straggler fixture shows up in the native
   ## shards rather than three jobs later.
