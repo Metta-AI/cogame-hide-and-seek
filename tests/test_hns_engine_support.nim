@@ -42,11 +42,27 @@ proc recordEpisode*(
         for cog in 0 ..< h.game.players.len:
           h.orders[cog] = baselineOrder(
             h.kinds[cog], h.game, h.ctl, cog, h.game.cogAlias(cog), turnIndex)
+          # The one turn every recording is guaranteed to shout on. A shout is
+          # the ONLY chat record that moves HASHED state (`recentShouts` is in
+          # `gameHash`), and the scripted baselines emit at most one short
+          # `say` per game and sometimes none — so a recording that waited for
+          # one left the whole record -> re-derive path around shouts
+          # uncovered.
+          if turnIndex == 1 and h.orders[cog].say.len == 0:
+            h.orders[cog].say = "cog " & $cog
           let directive = Directive(slot: cog, order: h.orders[cog],
                                     source: dsScripted)
           writer.writeChat(tickTime(h.game.tickCount), cog,
             directive.boundedOrderRecord(h.game.gameIndex + 1, turnIndex,
               h.game.cogAlias(cog), "", nil))
+          # Exactly what server.nim:1938-1941 does, in the same order: the
+          # shout is applied and then written to the chat stream BY COG INDEX,
+          # and playback re-applies it through `sim.applyShout` before the
+          # step at the same tick.
+          if h.orders[cog].say.len > 0:
+            if h.game.applyShout(cog, h.orders[cog].say):
+              writer.writeChat(tickTime(h.game.tickCount), cog,
+                h.orders[cog].say)
     var inputs = newSeq[InputState](h.game.players.len)
     for cog in 0 ..< h.game.players.len:
       var mask = 0'u8

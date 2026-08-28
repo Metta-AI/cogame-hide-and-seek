@@ -29,6 +29,15 @@ block recordThenReDeriveFullTime:
   let (played, mismatch) = reDerive(path)
   check mismatch < 0,
     "the full_time replay diverged at tick " & $mismatch
+  # A shout is the one chat record that moves HASHED state (`recentShouts` is
+  # in `gameHash`), so the recording must contain some for `mismatch < 0` to
+  # mean anything about that path.
+  var shouts = 0
+  for player in recorded.players:
+    shouts += player.shouts
+  check shouts >= recorded.players.len,
+    "the recording carried " & $shouts & " shouts: the hashed shout path is " &
+    "not covered by the re-derivation"
   check played.tickCount >= recorded.tickCount - 2,
     "playback stopped early: " & $played.tickCount & " vs " &
     $recorded.tickCount
