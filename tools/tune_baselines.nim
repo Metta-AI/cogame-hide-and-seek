@@ -34,24 +34,38 @@ const
     ##
     ## THE DESIGN NOTE ASKED FOR [+80, +400] — "burrow must clearly win as a
     ## hider without making the room unhuntable" — AND THE SWEEP DOES NOT
-    ## REACH IT with the shipped driver. Over three seeds played both ways
-    ## round the best cell measures around +/-100 permille and moves with the
-    ## room's pad layout, because the difference between the two baselines is
-    ## dominated by how often the DRIVER's push completes rather than by any
-    ## of the six constants. The band is therefore recorded at what the
-    ## harness can actually defend — the two baselines are different in shape
-    ## and NEITHER is degenerate — the whole grid is written to
+    ## REACH IT with the shipped driver. Re-measured after the `knownEnemy`
+    ## fix (r1 F1), with every cell now really exercising the chase and the
+    ## flinch, the grid runs from -467 to -276 permille: `burrow`'s fort does
+    ## NOT beat `scatter`'s roaming, because the difference between the two
+    ## baselines is dominated by how often the DRIVER's push completes rather
+    ## than by any of the six constants. The band is therefore recorded at
+    ## what the harness can actually defend — the two baselines are different
+    ## in shape and NEITHER is degenerate — the whole grid is written to
     ## tools/ci/baseline_tuning.json so the losing rows are on the record, and
-    ## `--check` still fails the build on ANY drift in the six shipped
-    ## constants. Widening the gap is a driver problem (the push stalls
-    ## against wall corners and against the 56 px doorways), not a constant
-    ## problem, and it is the first thing to fix in v2.
+    ## `--check` (a ci.yml step in the `test` job) fails the build on ANY
+    ## drift in the six shipped constants. Closing the gap is a driver problem
+    ## (the push stalls against wall corners and against the 56 px doorways),
+    ## not a constant problem, and it is the first thing to fix in v2.
 
   ## The matrix. Deliberately small — every cell is six real episodes, and the
   ## point is a defensible, reproducible choice, not a search of the whole
   ## space.
+  ##
+  ## The second axis is `chaseRadius`, not `flinchRadius`. The r1 review is
+  ## right that the recorded grid used to show `flinchRadius` having LITERALLY
+  ## ZERO effect — every triple carried an identical margin — and right that
+  ## `knownEnemy` (F1) was why. It is still zero with `knownEnemy` fixed: a
+  ## hider only flinches from a seeker it can SEE, and a hider parked in a
+  ## pocket facing its own door sees one inside 220 px too rarely to move six
+  ## episodes. `FlinchProbe` below measures exactly that and writes it into
+  ## the record, so the claim is on file rather than implied. `chaseRadius`
+  ## moves the margin by 165 permille across the same grid, so that is the
+  ## axis worth six episodes a cell.
   PanelReaches = [200, 260, 320]
-  FlinchRadii = [140, 180, 220]
+  ChaseRadii = [240, 340, 440]
+  FlinchProbe = [140, 180, 220]
+    ## Measured at the pick, and recorded — not searched.
 
 proc configJson(seed: int): string =
   $(%*{
@@ -128,18 +142,18 @@ when isMainModule:
     bestMargin = low(int)
     rows = newJArray()
   for panelReach in PanelReaches:
-    for flinch in FlinchRadii:
+    for chase in ChaseRadii:
       var params = DefaultBaselineParams
       params.panelReach = panelReach
-      params.flinchRadius = flinch
+      params.chaseRadius = chase
       let outcome = score(params)
       rows.add(%*{
         "panelReach": panelReach,
-        "flinchRadius": flinch,
+        "chaseRadius": chase,
         "margin": outcome.margin,
         "wins": outcome.wins
       })
-      echo &"panelReach={panelReach:<4} flinchRadius={flinch:<4} " &
+      echo &"panelReach={panelReach:<4} chaseRadius={chase:<4} " &
         &"margin={outcome.margin:<6} wins={outcome.wins}/{Seeds.len * 2}"
       # The pick is the cell with the LARGEST margin that still sits inside
       # the target band: a margin above the band means the room is not
@@ -154,7 +168,20 @@ when isMainModule:
     best = DefaultBaselineParams
     bestMargin = score(best).margin
   echo "pick: panelReach=", best.panelReach,
-    " flinchRadius=", best.flinchRadius, " margin=", bestMargin
+    " chaseRadius=", best.chaseRadius, " margin=", bestMargin
+  # The flinch probe: the same six episodes at the pick, with only
+  # `flinchRadius` moved. It is recorded rather than searched because it does
+  # not move the outcome — and a parameter with no measured effect belongs on
+  # the record saying so.
+  var probe = newJArray()
+  for flinch in FlinchProbe:
+    var params = best
+    params.flinchRadius = flinch
+    let outcome = score(params)
+    probe.add(%*{"flinchRadius": flinch, "margin": outcome.margin,
+                 "wins": outcome.wins})
+    echo &"probe flinchRadius={flinch:<4} margin={outcome.margin:<6} " &
+      &"wins={outcome.wins}/{Seeds.len * 2}"
   let picked = %*{
     "panelReach": best.panelReach,
     "rampSweep": best.rampSweep,
@@ -164,6 +191,7 @@ when isMainModule:
     "doorRotation": best.doorRotation,
     "margin": bestMargin,
     "marginBand": [MarginLo, MarginHi],
+    "flinchProbe": probe,
     "seeds": (block:
       var arr = newJArray()
       for seed in Seeds: arr.add(%seed)

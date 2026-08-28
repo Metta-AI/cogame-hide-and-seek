@@ -2,13 +2,30 @@
   "panelReach": 200,
   "rampSweep": 300,
   "flinchRadius": 140,
-  "chaseRadius": 340,
+  "chaseRadius": 440,
   "pushGiveUpTicks": 120,
   "doorRotation": 1,
-  "margin": -99,
+  "margin": -276,
   "marginBand": [
     -400,
     400
+  ],
+  "flinchProbe": [
+    {
+      "flinchRadius": 140,
+      "margin": -276,
+      "wins": 2
+    },
+    {
+      "flinchRadius": 180,
+      "margin": -276,
+      "wins": 2
+    },
+    {
+      "flinchRadius": 220,
+      "margin": -276,
+      "wins": 2
+    }
   ],
   "seeds": [
     42,
@@ -18,57 +35,57 @@
   "grid": [
     {
       "panelReach": 200,
-      "flinchRadius": 140,
-      "margin": -99,
+      "chaseRadius": 240,
+      "margin": -441,
       "wins": 2
     },
     {
       "panelReach": 200,
-      "flinchRadius": 180,
-      "margin": -99,
+      "chaseRadius": 340,
+      "margin": -347,
       "wins": 2
     },
     {
       "panelReach": 200,
-      "flinchRadius": 220,
-      "margin": -99,
+      "chaseRadius": 440,
+      "margin": -276,
       "wins": 2
     },
     {
       "panelReach": 260,
-      "flinchRadius": 140,
-      "margin": -300,
-      "wins": 1
+      "chaseRadius": 240,
+      "margin": -467,
+      "wins": 2
     },
     {
       "panelReach": 260,
-      "flinchRadius": 180,
-      "margin": -300,
-      "wins": 1
+      "chaseRadius": 340,
+      "margin": -373,
+      "wins": 2
     },
     {
       "panelReach": 260,
-      "flinchRadius": 220,
-      "margin": -300,
-      "wins": 1
+      "chaseRadius": 440,
+      "margin": -301,
+      "wins": 2
     },
     {
       "panelReach": 320,
-      "flinchRadius": 140,
-      "margin": -250,
-      "wins": 1
+      "chaseRadius": 240,
+      "margin": -453,
+      "wins": 2
     },
     {
       "panelReach": 320,
-      "flinchRadius": 180,
-      "margin": -250,
-      "wins": 1
+      "chaseRadius": 340,
+      "margin": -361,
+      "wins": 2
     },
     {
       "panelReach": 320,
-      "flinchRadius": 220,
-      "margin": -250,
-      "wins": 1
+      "chaseRadius": 440,
+      "margin": -283,
+      "wins": 2
     }
   ]
 }

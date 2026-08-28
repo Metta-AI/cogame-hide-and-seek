@@ -46,7 +46,7 @@ const DefaultBaselineParams* = BaselineParams(
   panelReach: 200,
   rampSweep: 300,
   flinchRadius: 140,
-  chaseRadius: 340,
+  chaseRadius: 440,
   pushGiveUpTicks: 120,
   doorRotation: 1
 )

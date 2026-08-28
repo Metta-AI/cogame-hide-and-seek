@@ -149,6 +149,16 @@ jobs:
           done
           exit "${fail}"
 
+      - name: Re-run the baseline tuning sweep
+        # The six baseline tunables are a SWEPT pick, not guesses
+        # (prompts/30-review-loop.md item 7). `--check` replays the whole grid
+        # -- nine cells of six real episodes plus the flinch probe, ~15 s in
+        # release -- and exits non-zero when the shipped DefaultBaselineParams
+        # or tools/ci/baseline_tuning.json no longer agree with what the
+        # harness measures. A guessed constant drifts silently; a harness in
+        # CI does not.
+        run: nim r --hints:off -d:release --path:src tools/tune_baselines.nim --check
+
   # ---------------------------------------------------------------------
   # Packaging smoke: the production image builds, and one real episode runs
   # end to end in raw docker with the certification fixture's seat mix.

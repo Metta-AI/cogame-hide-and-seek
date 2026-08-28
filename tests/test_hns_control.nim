@@ -4,6 +4,7 @@
 import std/[json, os, random, strutils, unicode]
 import helpers
 import hns/[sim_types, directives, baselines, control]
+import ../tools/tune_baselines
 
 const Intents = [intMoveTo, intHide, intWatch, intChase, intPush, intLock,
                  intUnlock, intVault]
@@ -307,13 +308,28 @@ block tuningIsTheSweptPick:
     "pushGiveUpTicks drifted from tools/ci/baseline_tuning.json"
   check record{"doorRotation"}.getInt() == DefaultBaselineParams.doorRotation,
     "doorRotation drifted from tools/ci/baseline_tuning.json"
+  # The band is read from the HARNESS, never from the record: a test that
+  # checks a file against a band the same file carries can never fail on a bad
+  # pick (r1 F6).
   let margin = record{"margin"}.getInt()
   let band = record{"marginBand"}
-  check margin >= band[0].getInt() and margin <= band[1].getInt(),
+  check band[0].getInt() == MarginLo and band[1].getInt() == MarginHi,
+    "the recorded band [" & $band[0].getInt() & ", " & $band[1].getInt() &
+    "] is not the harness's [" & $MarginLo & ", " & $MarginHi & "]"
+  check margin >= MarginLo and margin <= MarginHi,
     "the recorded burrow-vs-scatter margin " & $margin &
-    " is outside the recorded band"
-  check margin.abs <= 400,
-    "the two baselines are no longer comparable: margin " & $margin
+    " is outside the harness's band"
   check record{"grid"}.len >= 4, "the sweep recorded no grid"
+  # And the grid MEASURED something: an axis whose every cell carries the same
+  # margin tuned nothing, which is exactly what the pre-F1 record showed.
+  var margins: seq[int]
+  for row in record{"grid"}:
+    if row{"margin"}.getInt() notin margins:
+      margins.add(row{"margin"}.getInt())
+  check margins.len >= 3,
+    "every cell of the swept grid measured the same margin: the sweep tuned " &
+    "nothing"
+  check record{"flinchProbe"}.len == 3,
+    "the record carries no flinchRadius probe"
 
 echo "test_hns_control: ok"
