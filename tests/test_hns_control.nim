@@ -180,6 +180,50 @@ block knownEnemyReportsASighting:
   check not ctl.knownEnemy(game, 1).known,
     "a sighting older than HuntMemoryTicks was still reported as known"
 
+# --- a heard shout is jittered ---------------------------------------------
+block aHeardShoutGivesTheNeighbourhoodNotThePixel:
+  ## §Per-seat observation: "the team that shouted, the text, THE JITTERED
+  ## POSITION". Reporting `shout.x, shout.y` let a listener triangulate a
+  ## hider from a `say` it was never meant to locate.
+  var game = newTestSim()
+  game.seatAll()
+  game.startGame()
+  var engine = initDecisionEngine(game)
+  var moved = 0
+  for cog in 0 ..< game.players.len:
+    game.players[cog].lastShoutTick = low(int) div 2
+    check game.applyShout(cog, "over here"), "the sim refused a shout"
+  for shout in game.recentShouts:
+    let at = shoutHeardAt(shout)
+    check abs(at.x - shout.x) <= ShoutJitterPx and
+      abs(at.y - shout.y) <= ShoutJitterPx,
+      "the jitter strayed further than ShoutJitterPx"
+    check at.x >= 0 and at.x < MapWidth and at.y >= 0 and at.y < MapHeight,
+      "a jittered shout landed off the board"
+    check at == shoutHeardAt(shout),
+      "the jitter is not a pure function of the shout"
+    if at.x != shout.x or at.y != shout.y:
+      inc moved
+  check moved >= game.recentShouts.len - 1,
+    "only " & $moved & " of " & $game.recentShouts.len &
+    " shouts moved: the jitter is not doing anything"
+  # And the observation carries the jittered value, not the true one.
+  var reported = 0
+  for seat in 0 ..< game.seatCount():
+    let view = engine.seatViewJson(game, seat, 1)
+    for entry in view{"heard"}:
+      let
+        x = entry["at"][0].getInt()
+        y = entry["at"][1].getInt()
+      inc reported
+      var exact = false
+      for shout in game.recentShouts:
+        if shout.x == x and shout.y == y and
+            shoutHeardAt(shout) != (x, y):
+          exact = true
+      check not exact, "a seat was told a shouter's exact pixel"
+  check reported > 0, "no seat heard any of the six shouts"
+
 # --- 22. the fallback IS the burrow proc -----------------------------------
 block fallbackIsTheBurrowProc:
   var game = newTestSim()

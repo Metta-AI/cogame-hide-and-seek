@@ -650,6 +650,24 @@ proc forceFaultStop*(sim: var SimServer, detail: string) =
   # both go through this proc.
   sim.stopDetail = sanitizeLine(detail, MaxFallbackDetailRunes)
 
+proc shoutHeardAt*(shout: Shout): tuple[x, y: int] =
+  ## Where a LISTENER is told a shout came from: the true spot plus a
+  ## deterministic jitter of at most `ShoutJitterPx`. The starter's
+  ## `shoutOffset` (`src/ctf/global.nim:3946-3957`), ported verbatim in shape
+  ## — a pure function of the shout, so it needs no draw of its own, is the
+  ## same on every target and in every replay, and cannot desynchronise a
+  ## hash chain. A listener learns the NEIGHBOURHOOD a shout came from; the
+  ## exact pixel is the shouter's to keep, and reporting it let a seat triangulate
+  ## a hider from a `say` it was never meant to locate.
+  var h = 0x2545F491'u32
+  h = (h xor uint32(shout.tick)) * 0x85EBCA6B'u32
+  h = (h xor uint32(shout.x)) * 0xC2B2AE35'u32
+  h = (h xor uint32(shout.y)) * 0x27D4EB2F'u32
+  h = h xor (h shr 15)
+  let span = uint32(2 * ShoutJitterPx + 1)
+  (clamp(shout.x + int(h mod span) - ShoutJitterPx, 0, MapWidth - 1),
+   clamp(shout.y + int((h shr 16) mod span) - ShoutJitterPx, 0, MapHeight - 1))
+
 proc applyControlRecord*(sim: var SimServer, record: string) =
   ## Re-applies one replay CONTROL record at playback. Everything but `stop`
   ## lands in NON-HASHED presentation state (the broadcast feed); `stop` is the

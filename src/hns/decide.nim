@@ -188,10 +188,13 @@ proc seatViewJson*(
   for shout in sim.recentShouts:
     if not sim.shoutAudibleTo(index, shout):
       continue
+    # The JITTERED position (§Per-seat observation): a heard shout gives the
+    # neighbourhood, never the shouter's exact pixel.
+    let at = shoutHeardAt(shout)
     heard.add(%*{
       "team": roleText(shout.team),
       "text": shout.text,
-      "at": [shout.x, shout.y],
+      "at": [at.x, at.y],
       "ticks_ago": sim.tickCount - shout.tick
     })
 

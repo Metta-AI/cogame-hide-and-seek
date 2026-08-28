@@ -211,6 +211,10 @@ var
   FovGridH* = (MapHeight + FovCellSize - 1) div FovCellSize
   FovCellCount* = FovGridW * FovGridH
   ShoutRange* = MapWidth div 5  ## audible within 20% of the board width.
+  ShoutJitterPx* = 20
+    ## Max px a HEARD shout's reported position strays from the true spot
+    ## (the starter's `SoundRingJitter`). A listener learns the neighbourhood
+    ## a shout came from, never the shouter's exact pixel.
 
 type
   Team* = enum
