@@ -20,9 +20,9 @@
   "turns": 5,
   "phaseLeft": 11,
   "room": "warren",
-  "hidden": 184,
-  "seen": 0,
-  "margin": 1000,
+  "hidden": 175,
+  "seen": 9,
+  "margin": 902,
   "sealed": 3,
   "hiders": 3,
   "lockedHiders": 2,
@@ -34,13 +34,13 @@
       "id": "box1",
       "kind": "crate",
       "box": [
-        525,
-        93,
+        533,
+        91,
         64,
         64
       ],
       "locked": "hiders",
-      "held": false
+      "held": true
     },
     {
       "id": "box2",
@@ -82,8 +82,8 @@
       "id": "pan1",
       "kind": "panel",
       "box": [
-        152,
-        85,
+        150,
+        89,
         128,
         32
       ],
@@ -130,8 +130,8 @@
   "teams": {
     "red": {
       "role": "hiders",
-      "seen": 0,
-      "unseen": 552,
+      "seen": 9,
+      "unseen": 543,
       "locked": 2,
       "sealed": 3,
       "exposed": false,
@@ -155,8 +155,8 @@
       "name": "Seat 1",
       "pol": "Seat 1",
       "kind": "",
-      "seen": 0,
-      "unseen": 184,
+      "seen": 9,
+      "unseen": 175,
       "locks": 1,
       "vaults": 0,
       "fb": 0,
@@ -217,10 +217,10 @@
       "kind": "",
       "seen": 0,
       "unseen": 184,
-      "locks": 1,
+      "locks": 0,
       "vaults": 0,
       "fb": 0,
-      "holding": "",
+      "holding": "box1",
       "sealed": true
     },
     {
@@ -241,6 +241,12 @@
   ],
   "pov": -1,
   "events": [
+    {
+      "k": "lock",
+      "object": "box1",
+      "team": "hiders",
+      "tick": 185
+    },
     {
       "k": "lock",
       "object": "box2",
@@ -264,12 +270,12 @@
       "slot": 1,
       "alias": "SEEKER-alpha",
       "from": [
-        385,
-        103
+        383,
+        99
       ],
       "to": [
-        385,
-        103
+        383,
+        99
       ],
       "ok": true,
       "tick": 185
@@ -279,8 +285,8 @@
       "slot": 0,
       "alias": "HIDER-alpha",
       "text": "WWWWWWWWWW",
-      "x": 201,
-      "y": 69,
+      "x": 196,
+      "y": 67,
       "tick": 185
     },
     {
@@ -288,8 +294,8 @@
       "slot": 1,
       "alias": "SEEKER-alpha",
       "text": "MMMMMMMMMM",
-      "x": 385,
-      "y": 103,
+      "x": 383,
+      "y": 99,
       "tick": 185
     },
     {
@@ -315,8 +321,8 @@
       "slot": 4,
       "alias": "HIDER-gamma",
       "text": "iiiiiiiiii",
-      "x": 598,
-      "y": 135,
+      "x": 605,
+      "y": 131,
       "tick": 185
     },
     {

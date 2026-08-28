@@ -36,7 +36,7 @@ const
     ## hider without making the room unhuntable" — AND THE SWEEP DOES NOT
     ## REACH IT with the shipped driver. Re-measured after the `knownEnemy`
     ## fix (r1 F1), with every cell now really exercising the chase and the
-    ## flinch, the grid runs from -467 to -276 permille: `burrow`'s fort does
+    ## flinch, the grid runs from -445 to -178 permille: `burrow`'s fort does
     ## NOT beat `scatter`'s roaming, because the difference between the two
     ## baselines is dominated by how often the DRIVER's push completes rather
     ## than by any of the six constants. The band is therefore recorded at
@@ -60,7 +60,7 @@ const
   ## pocket facing its own door sees one inside 220 px too rarely to move six
   ## episodes. `FlinchProbe` below measures exactly that and writes it into
   ## the record, so the claim is on file rather than implied. `chaseRadius`
-  ## moves the margin by 165 permille across the same grid, so that is the
+  ## moves the margin by ~170 permille across the same grid, so that is the
   ## axis worth six episodes a cell.
   PanelReaches = [200, 260, 320]
   ChaseRadii = [240, 340, 440]

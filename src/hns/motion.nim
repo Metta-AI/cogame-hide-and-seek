@@ -219,7 +219,17 @@ proc applyMomentumAxis(
         if blocker >= 0:
           sim.bouncePlayers(playerIndex, blocker, horizontal)
         elif sim.players[playerIndex].holding >= 0:
+          # The note's tick step 6, for the HELD pair only: "neither moves
+          # this tick, the cog's velocity on the blocked axis is zeroed, and
+          # pushBlockedTicks[slot] += 1". Zeroing the carry alone left the
+          # velocity standing, so a cog that had been shoving a crate into a
+          # wall resumed at FULL speed the instant the refusal cleared. A
+          # plain wall bump keeps the starter's behaviour.
           inc sim.players[playerIndex].pushBlockedTicks
+          if horizontal:
+            sim.players[playerIndex].velX = 0
+          else:
+            sim.players[playerIndex].velY = 0
         carry = 0
         break
   if horizontal:
@@ -268,11 +278,11 @@ proc applyInput*(
 
   let
     maxSpeed = sim.config.maxSpeedFor(player.holding >= 0)
-    accel =
-      if player.holding >= 0:
-        sim.config.accel * sim.config.carrySpeedPct div 100
-      else:
-        sim.config.accel
+    # `carrySpeedPct` scales the SPEED CAP and nothing else (note, tick step
+    # 6: "a cog holding an object has its `MaxSpeed` scaled by
+    # `carrySpeedPct = 55`"). Scaling the acceleration too made a holder take
+    # three times as long to reach a cap that is already 55 % of normal.
+    accel = sim.config.accel
 
   if inputX != 0:
     player.velX = clamp(player.velX + inputX * accel, -maxSpeed, maxSpeed)

@@ -5,7 +5,7 @@
   "chaseRadius": 440,
   "pushGiveUpTicks": 120,
   "doorRotation": 1,
-  "margin": -276,
+  "margin": -178,
   "marginBand": [
     -400,
     400
@@ -13,17 +13,17 @@
   "flinchProbe": [
     {
       "flinchRadius": 140,
-      "margin": -276,
+      "margin": -178,
       "wins": 2
     },
     {
       "flinchRadius": 180,
-      "margin": -276,
+      "margin": -178,
       "wins": 2
     },
     {
       "flinchRadius": 220,
-      "margin": -276,
+      "margin": -178,
       "wins": 2
     }
   ],
@@ -36,55 +36,55 @@
     {
       "panelReach": 200,
       "chaseRadius": 240,
-      "margin": -441,
-      "wins": 2
-    },
-    {
-      "panelReach": 200,
-      "chaseRadius": 340,
       "margin": -347,
       "wins": 2
     },
     {
       "panelReach": 200,
+      "chaseRadius": 340,
+      "margin": -249,
+      "wins": 2
+    },
+    {
+      "panelReach": 200,
       "chaseRadius": 440,
-      "margin": -276,
+      "margin": -178,
       "wins": 2
     },
     {
       "panelReach": 260,
       "chaseRadius": 240,
-      "margin": -467,
+      "margin": -442,
       "wins": 2
     },
     {
       "panelReach": 260,
       "chaseRadius": 340,
-      "margin": -373,
+      "margin": -349,
       "wins": 2
     },
     {
       "panelReach": 260,
       "chaseRadius": 440,
-      "margin": -301,
+      "margin": -278,
       "wins": 2
     },
     {
       "panelReach": 320,
       "chaseRadius": 240,
-      "margin": -453,
+      "margin": -445,
       "wins": 2
     },
     {
       "panelReach": 320,
       "chaseRadius": 340,
-      "margin": -361,
+      "margin": -350,
       "wins": 2
     },
     {
       "panelReach": 320,
       "chaseRadius": 440,
-      "margin": -283,
+      "margin": -278,
       "wins": 2
     }
   ]
