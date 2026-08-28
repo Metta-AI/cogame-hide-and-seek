@@ -1441,7 +1441,7 @@ proc runServerLoop*(
           if squadMode:
             # A seat that drops does NOT remove its cogs: the squad is fixed
             # for the whole episode, its directive source degrades to the
-            # holdline baseline, and the seat revives on reconnect. Deleting
+            # `burrow` baseline, and the seat revives on reconnect. Deleting
             # the row would renumber every later cog mid-replay.
             discard removeWebSocketState(websocket)
             continue
@@ -1492,7 +1492,7 @@ proc runServerLoop*(
         if squadMode and not squadsBuilt and sim.lobbyJoinTimedOut():
           # A seat that never connects does NOT end the episode. Report the
           # no-show to the platform (lowest missing slot only), then build the
-          # squads anyway: that seat's cogs run the published holdline
+          # squads anyway: that seat's cogs run the published `burrow`
           # baseline for the whole episode and both games play to full time.
           let stuckSlot = sim.nextPlayerSlot()
           declarePlayerFailure(
@@ -1500,7 +1500,7 @@ proc runServerLoop*(
             "player slot " & $stuckSlot & " never joined the lobby within " &
               $sim.config.lobbyJoinTimeoutTicks & " lobby ticks (~" &
               $(sim.config.lobbyJoinTimeoutTicks div TargetFps) &
-              "s); its squad plays the holdline baseline"
+              "s); its squad plays the burrow baseline"
           )
           squadForceStart = true
         if not replayLoaded and not squadMode and sim.lobbyJoinTimedOut():
@@ -1687,7 +1687,7 @@ proc runServerLoop*(
           # first registration and the one it re-sends after its first frame
           # can arrive while its player index is still 0x7fffffff. Clearing the
           # table then discarded them for good and the champion played the
-          # scripted holdline baseline for the whole episode with no `register`
+          # scripted `burrow` baseline for the whole episode with no `register`
           # record at all (paintball round 3, 2026-08-25: "player connected:
           # daveey-1" first, then only "seat 0 registered" twice). Bounded by
           # construction: one entry per live socket, dropped with the socket.

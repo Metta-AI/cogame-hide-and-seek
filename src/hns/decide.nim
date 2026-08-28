@@ -335,16 +335,18 @@ proc noteRequests(engine: var DecisionEngine, count: int) =
   for _ in 0 ..< count:
     engine.requestStamps.add(now)
 
-proc installOrder(engine: var DecisionEngine, seat: int, order: Order,
-                  source: DirectiveSource, latencyMs = 0) =
+proc installOrder(engine: var DecisionEngine, seat: int, order: Order) =
+  ## The standing order for this seat, and the two lines that outlive the turn
+  ## (`radio` is what teammates read next turn; `notes` is the seat's own
+  ## private channel). The DIRECTIVE's source and latency are the caller's:
+  ## they ride `sources[]`/`latencies[]` into the record, and this proc used to
+  ## take and `discard` them, which read as if it recorded them.
   engine.orders[seat] = order
   engine.haveOrder[seat] = true
   if order.radio.len > 0:
     engine.radio[seat] = order.radio
   if order.notes.len > 0:
     engine.notes[seat] = order.notes
-  discard source
-  discard latencyMs
 
 proc turn*(
   engine: var DecisionEngine,
@@ -397,8 +399,7 @@ proc turn*(
     elif engine.seats[seat].isLlm:
       # An LLM seat that CANNOT call the LLM this turn is a FALLBACK, not a
       # scripted policy: recording it is what makes the two countable.
-      engine.installOrder(seat, engine.burrowFor(sim, seat, turnIndex),
-        dsFallback)
+      engine.installOrder(seat, engine.burrowFor(sim, seat, turnIndex))
       sources[seat] = dsFallback
       let cause = if engine.llmOff: "budget_guard" else: "no_credentials"
       result.add(fallbackRecord(game, turnIndex, seat, 1, cause,
@@ -407,10 +408,8 @@ proc turn*(
         " falling back to burrow (", cause, ") on turn ", turnIndex
     else:
       engine.installOrder(seat,
-        engine.scriptedFor(sim, seat, turnIndex, engine.seats[seat].baseline),
-        dsScripted)
+        engine.scriptedFor(sim, seat, turnIndex, engine.seats[seat].baseline))
       sources[seat] = dsScripted
-    discard index
 
   # --- the rate floor ------------------------------------------------------
   # Hold the START of consecutive batches `turnSpacingMs` apart, which pins
@@ -427,8 +426,7 @@ proc turn*(
   # --- the rolling rate guard ----------------------------------------------
   if open.len > 0 and engine.rateGuardBlocks(open.len):
     for seat in open:
-      engine.installOrder(seat, engine.burrowFor(sim, seat, turnIndex),
-        dsFallback)
+      engine.installOrder(seat, engine.burrowFor(sim, seat, turnIndex))
       sources[seat] = dsFallback
       result.add(fallbackRecord(game, turnIndex, seat, 1, "rate_guard",
         "the trailing 60 s request count would exceed the provider cap"))
@@ -509,7 +507,7 @@ proc turn*(
           order.notes = keepNotes
           if parsed.rejected:
             engine.lastResult[seat] = "unknown_object"
-        engine.installOrder(seat, order, dsLlm, latency)
+        engine.installOrder(seat, order)
         sources[seat] = dsLlm
         latencies[seat] = latency
       except CatchableError as error:
@@ -534,8 +532,7 @@ proc turn*(
 
   # --- anything still open plays burrow for this turn ----------------------
   for seat in open:
-    engine.installOrder(seat, engine.burrowFor(sim, seat, turnIndex),
-      dsFallback)
+    engine.installOrder(seat, engine.burrowFor(sim, seat, turnIndex))
     sources[seat] = dsFallback
     let cause =
       if engine.client.disabled or engine.client.transport == ltNone:
