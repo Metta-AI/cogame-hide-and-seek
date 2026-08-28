@@ -1,7 +1,7 @@
 ## Sim unit tests (design note §Tests, 1-15). Every one of these plays the
 ## real sim through the real control layer.
 
-import std/[json, math, os, random, strutils, times]
+import std/[json, math, os, random, strutils, times, unicode]
 import helpers
 
 # --- 1. phase clock --------------------------------------------------------
@@ -370,6 +370,27 @@ block faultStop:
   check h.game.endReason == ReasonFault, "the fault stop did not set fault"
   check h.game.endRule == EndRuleSimFault, "the fault stop did not set sim_fault"
   check h.game.stopDetail.len > 0, "the fault stop recorded no detail"
+
+block faultStopDetailIsRuneTruncated:
+  ## `stopDetail` carries a caught exception's `msg` and reaches the results
+  ## document (roster.nim) and from there the replay's `result` record, so it
+  ## obeys the same cap as every other recorded string (checklist 9).
+  const Emoji = "\u{1F600}"   ## a 4-byte codepoint
+  var detail = ""
+  for i in 0 ..< MaxFallbackDetailRunes + 40:
+    detail.add(Emoji)
+  var h = newHarness()
+  h.stepOnce()
+  h.game.forceFaultStop(detail)
+  check h.game.stopDetail.runeLen == MaxFallbackDetailRunes,
+    "stopDetail was not cut to the rune cap: " & $h.game.stopDetail.runeLen
+  check validateUtf8(h.game.stopDetail) < 0,
+    "the stopDetail cut left a broken codepoint"
+  let results = parseJson(h.game.roomResultsJson())
+  check results{"stopDetail"}.getStr().runeLen == MaxFallbackDetailRunes,
+    "the results document carried an untruncated stopDetail"
+  check validateUtf8(results{"stopDetail"}.getStr()) < 0,
+    "the results document carried invalid UTF-8 in stopDetail"
 
 # --- 15. tick budget -------------------------------------------------------
 # Release only: a debug build is 10-50x slower through the per-pixel code, so

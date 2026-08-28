@@ -12,7 +12,7 @@ import
   bitworld/[pixelfonts, spriteprotocol],
   pixie,
   sim_types, sim_config, room, sim_state, objects, motion, vision, phase,
-  fort, roster, map_art, rig_art, upstream
+  fort, roster, map_art, rig_art, upstream, directives
 
 export sim_types, sim_config, room, sim_state, objects, motion, vision,
   phase, fort, roster, map_art, rig_art, upstream
@@ -626,7 +626,13 @@ proc forceFaultStop*(sim: var SimServer, detail: string) =
   sim.gameOverTimer = 0
   sim.endReason = ReasonFault
   sim.endRule = EndRuleSimFault
-  sim.stopDetail = detail
+  # Rune-truncated HERE, not at the caller: `stopDetail` reaches the results
+  # document (roster.nim) and from there the replay's `result` record, and it
+  # carries a caught exception's `msg`. The stop RECORD already goes through
+  # `sanitizeLine` (server.nim); this is the same cut for the same string on
+  # the other path, and it is applied on record and on playback alike because
+  # both go through this proc.
+  sim.stopDetail = sanitizeLine(detail, MaxFallbackDetailRunes)
 
 proc applyControlRecord*(sim: var SimServer, record: string) =
   ## Re-applies one replay CONTROL record at playback. Everything but `stop`
