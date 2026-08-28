@@ -1,7 +1,7 @@
 ## 14 + 19. The determinism rails: no NEW float expression may feed a hashed
 ## value, and a replay must re-derive from its own bytes.
 
-import std/[json, os, strutils]
+import std/[json, os, strutils, tables]
 import helpers
 import hns/[sim_types, replays, replay_runtime]
 
@@ -57,6 +57,72 @@ block theFovConeFilterIsStillFloatAndStillWhitelisted:
   check "sqrt(d2)" in vision,
     "applyFovCone no longer uses the starter's sqrt expression; the " &
     "native<->wasm hash chain depends on it being byte-identical"
+
+const FloatBearingProcs = {
+  "castFovOctant": 4,
+  "computeFovShadowcast": 2,
+  "applyFovCone": 6,
+  "playerVisibleTo": 4
+}
+  ## `src/hns/vision.nim` is NOT integer-only — it is the starter's float cone
+  ## filter, kept because it is already the mechanism the native<->wasm hash
+  ## chain survives. But it feeds `seenTicks`/`hiddenTicks`, which are hashed,
+  ## so the rule that matters here is the note's: no NEW float expression may
+  ## appear. The grep above cannot say that, so this pins WHERE the floats are
+  ## and HOW MANY lines carry them, per proc. A float expression added anywhere
+  ## else in the file — or an extra one inside these three — fails the build
+  ## and has to be argued for in the diff.
+  ##
+  ## `playerVisibleTo`'s four are the airborne branch (design divergence 4): a
+  ## vaulting cog is judged against the STATIC wall mask because its head is
+  ## over the furniture. Its cone test is asserted below to be the SAME
+  ## expression `applyFovCone` uses, so the two can never drift onto different
+  ## libm calls.
+
+block visionsFloatsAreOnlyWhereTheNoteSaysTheyAre:
+  var current = ""
+  var counted = initTable[string, int]()
+  for index, line in codeLines("src/hns/vision.nim"):
+    if line.startsWith("proc "):
+      current = line[5 .. ^1].split({'*', '(', ' ', ':'})[0]
+    var floaty = "float" in line or "sqrt" in line or "cos(" in line or
+      "sin(" in line or " / " in line
+    if not floaty:
+      for j in 1 ..< max(1, line.len - 1):
+        if line[j] == '.' and line[j - 1].isDigit() and line[j + 1].isDigit():
+          floaty = true
+    if not floaty:
+      continue
+    check current.len > 0, "a float expression outside every proc, at line " &
+      $(index + 1) & ": " & line.strip()
+    counted.mgetOrPut(current, 0) += 1
+  for name, expected in FloatBearingProcs.items:
+    check counted.getOrDefault(name) == expected,
+      "src/hns/vision.nim's " & name & " carries " &
+      $counted.getOrDefault(name) & " float-bearing lines, not the pinned " &
+      $expected & ". A NEW float expression feeding a hashed value is how a " &
+      "native<->wasm chain diverges: argue for it in the diff, then re-pin."
+  for name, count in counted:
+    var known = false
+    for pinned, _ in FloatBearingProcs.items:
+      if pinned == name:
+        known = true
+    check known, "src/hns/vision.nim's " & name & " is a NEW float-bearing " &
+      "proc (" & $count & " lines) on the hashed path"
+
+block theAirborneConeIsTheFovConeExpression:
+  ## Divergence 4's cone test and applyFovCone's are the same expression, on
+  ## the same libm, in the same order. If one is ever edited without the
+  ## other, the airborne path becomes the NEW float expression the note
+  ## forbids.
+  let vision = readFile("src/hns/vision.nim")
+  check countOccurrences(vision,
+    "cos(float(sim.config.visionConeDeg) * PI / 180.0)") == 2,
+    "the airborne branch and applyFovCone no longer compute coneCos with the " &
+    "same expression"
+  check countOccurrences(vision, "coneCos * sqrt(") == 2,
+    "the airborne branch and applyFovCone no longer compare against " &
+    "coneCos * sqrt(...) the same way"
 
 block hashCoversTheObjectLayer:
   var h = newHarness()
