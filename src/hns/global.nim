@@ -204,6 +204,20 @@ proc scaleSpritePixels(
       for c in 0 .. 3:
         result[dst + c] = pixels[src + c]
 
+proc boardSpriteUnchanged(
+  defs: openArray[SpriteDefinition],
+  spriteId, width, height: int,
+  label: string
+): bool =
+  ## The same question `addBoardSpriteChanged` asks itself, asked BEFORE the
+  ## pixels are baked: does this viewer already hold exactly this sprite? A
+  ## per-frame family whose bake is expensive (the vision cones) checks this
+  ## first and skips the bake, rather than paying for a buffer the dedup then
+  ## throws away.
+  let index = defs.spriteDefinitionIndex(spriteId)
+  index >= 0 and defs[index].width == width * boardScale and
+    defs[index].height == height * boardScale and defs[index].label == label
+
 proc addBoardSpriteChanged(
   packet: var seq[uint8],
   defs: var seq[SpriteDefinition],
@@ -428,58 +442,98 @@ proc buildSpottedRingSprite(): seq[uint8] =
       if d2 <= outer * outer and d2 >= inner * inner:
         result.putPixel(n, x, y, rgba(236, 72, 60, 220))
 
+proc coneSpriteBox*(range, coneDeg, aimBrads: int):
+    tuple[w, h, offX, offY: int] =
+  ## The wedge's bounding box, in map pixels, relative to the cog: the sprite
+  ## is only ever as big as the beam. A 70-degree wedge in a square canvas of
+  ## side 2*range+2 wastes four fifths of the buffer, and the buffer is baked,
+  ## upscaled and shipped EVERY FRAME the cone changes (the r1 review's F11
+  ## cost).
+  let half = float(coneDeg) * PI / 180.0
+  var
+    minX = 0.0
+    maxX = 0.0
+    minY = 0.0
+    maxY = 0.0
+  # The origin plus the arc, sampled a degree at a time: cheap, and it cannot
+  # miss the axis extremes the way three corner points can.
+  for step in 0 .. coneDeg * 2:
+    let
+      (ax, ay) = aimVector(aimBrads)
+      angle = -half + float(step) * PI / 180.0
+      dx = float(range) * (ax * cos(angle) - ay * sin(angle))
+      dy = float(range) * (ax * sin(angle) + ay * cos(angle))
+    minX = min(minX, dx)
+    maxX = max(maxX, dx)
+    minY = min(minY, dy)
+    maxY = max(maxY, dy)
+  let
+    x0 = int(floor(minX)) - 1
+    y0 = int(floor(minY)) - 1
+    x1 = int(ceil(maxX)) + 1
+    y1 = int(ceil(maxY)) + 1
+  (x1 - x0 + 1, y1 - y0 + 1, x0, y0)
+
 proc buildConeSprite*(sim: SimServer, playerIndex, range, coneDeg,
                      aimBrads: int,
-                     seeker: bool): tuple[w, h: int, pixels: seq[uint8]] =
-  ## One cog's torch beam as a translucent wedge, drawn into a square canvas
-  ## centred on the cog, CLIPPED BY THE SIM'S OWN FOG (readout 2: "clipped by
-  ## walls and objects exactly as the sim clips it"). The wedge used to be
-  ## drawn unclipped and layered under the objects, on the argument that an
-  ## object drawn on top of it reads as the thing that stopped it — but a WALL
-  ## is part of the baked room bed, not an object, so a beam visibly ran
-  ## straight through walls and told the spectator the seeker could see
-  ## through them.
+                     seeker: bool): tuple[w, h, offX, offY: int,
+                                          pixels: seq[uint8]] =
+  ## One cog's torch beam as a translucent wedge, CLIPPED BY THE SIM'S OWN FOG
+  ## (readout 2: "clipped by walls and objects exactly as the sim clips it").
+  ## The wedge used to be drawn unclipped and layered under the objects, on the
+  ## argument that an object drawn on top of it reads as the thing that stopped
+  ## it — but a WALL is part of the baked room bed, not an object, so a beam
+  ## visibly ran straight through walls and told the spectator the seeker could
+  ## see through them.
   ##
-  ## The clip is a lookup into the cog's own fov cache, which the sim
-  ## refreshed this tick (`refreshPlayerFov`, tick step 9), so the drawn wedge
-  ## IS the sim's answer rather than a second implementation of it. An
-  ## unrefreshed cache reports everything visible, which degrades to exactly
-  ## the old unclipped wedge.
+  ## The clip is a lookup into the cog's own fov cache, which the sim refreshed
+  ## this tick (`refreshPlayerFov`, tick step 9), so the drawn wedge IS the
+  ## sim's answer rather than a second implementation of it. An unrefreshed
+  ## cache reports everything visible, which degrades to exactly the old
+  ## unclipped wedge.
+  ##
+  ## The canvas is the wedge's bounding box, not a square of side 2*range+2:
+  ## `offX`/`offY` place it relative to the cog.
   let
-    n = range * 2 + 2
-    c = n div 2
+    box = coneSpriteBox(range, coneDeg, aimBrads)
     tint =
       if seeker: rgba(250, 196, 84, 54)
       else: rgba(120, 168, 236, 34)
-  var pixels = rgbaBuffer(n, n)
+  var pixels = rgbaBuffer(box.w, box.h)
   let
     half = float(coneDeg) * PI / 180.0
     (ax, ay) = aimVector(aimBrads)
     cosHalf = cos(half)
     originX = sim.players[playerIndex].x
     originY = sim.players[playerIndex].y
-  for y in 0 ..< n:
-    for x in 0 ..< n:
+    (ocx, ocy) = fovCellAt(originX, originY)
+  for y in 0 ..< box.h:
+    for x in 0 ..< box.w:
       let
-        vx = float(x - c)
-        vy = float(y - c)
+        vx = float(x + box.offX)
+        vy = float(y + box.offY)
         d2 = vx * vx + vy * vy
       if d2 > float(range * range) or d2 < 1.0:
         continue
       if vx * ax + vy * ay < cosHalf * sqrt(d2):
         continue
+      # The lookup is CELL-aligned to the cog's own cell, not to its exact
+      # pixel: the fog is an 8 px grid, so this is no coarser than the answer
+      # it reads, and it makes the sprite a function of the cog's CELL rather
+      # than of its pixel — which is what lets the label dedup a cog that
+      # walked two pixels without turning.
       let
-        mx = originX + x - c
-        my = originY + y - c
-      if mx < 0 or my < 0 or mx >= MapWidth or my >= MapHeight:
+        cx = ocx + floorDiv(x + box.offX, FovCellSize)
+        cy = ocy + floorDiv(y + box.offY, FovCellSize)
+      if cx < 0 or cy < 0 or cx >= FovGridW or cy >= FovGridH:
         continue
-      if not sim.fovVisibleAt(playerIndex, mx, my):
+      if not sim.fovVisibleAt(playerIndex, cx * FovCellSize, cy * FovCellSize):
         continue
       var shade = tint
       let fade = 1.0 - sqrt(d2) / float(range)
       shade.a = uint8(float(tint.a) * (0.35 + 0.65 * fade))
-      pixels.putPixel(n, x, y, shade)
-  (n, n, pixels)
+      pixels.putPixel(box.w, x, y, shade)
+  (box.w, box.h, box.offX, box.offY, pixels)
 
 proc buildTetherSprite(dx, dy: int): tuple[w, h: int, pixels: seq[uint8]] =
   ## The line from a dragging cog to the object it holds.
@@ -629,20 +683,30 @@ proc buildSpriteProtocolUpdates*(
       continue
     let
       seeker = player.team == Blue
-      cone = sim.buildConeSprite(i, sim.config.sightRange,
-        sim.config.visionConeDeg, player.aimBrads, seeker)
+      cell = fovCellAt(player.x, player.y)
+      box = coneSpriteBox(sim.config.sightRange, sim.config.visionConeDeg,
+        player.aimBrads)
       # The wedge is CLIPPED by this cog's fog, so its pixels depend on where
       # the cog stands and on where the furniture stands — both belong in the
       # dedup key, or a cog that walked without turning would keep the cone it
-      # had at its old spot.
+      # had at its old spot. The position is the cog's fov CELL, which is the
+      # resolution the clip is computed at.
       label = LabelVisionCone & " " & $slot & " aim " & $player.aimBrads &
         " deg " & $sim.config.visionConeDeg & " range " &
-        $sim.config.sightRange & " at " & $player.x & "," & $player.y &
+        $sim.config.sightRange & " at " & $cell.cx & "," & $cell.cy &
         " geo " & $sim.geometryEpoch & " on"
-    packet.addBoardSpriteChanged(nextState.spriteDefs, spriteId,
-      cone.w, cone.h, cone.pixels, label)
-    packet.addBoardObject(objectId, player.x - cone.w div 2,
-      player.y - cone.h div 2, -900, MapLayerId, spriteId)
+    # Rasterising a 682x682 wedge costs ~1.4 ms per cog; doing it and then
+    # letting `addBoardSpriteChanged` discard the result is the per-frame cost
+    # the r1 review measured. Ask the dedup FIRST and skip the bake entirely
+    # when this viewer already holds this exact cone.
+    if not nextState.spriteDefs.boardSpriteUnchanged(spriteId, box.w, box.h,
+        label):
+      let cone = sim.buildConeSprite(i, sim.config.sightRange,
+        sim.config.visionConeDeg, player.aimBrads, seeker)
+      packet.addBoardSpriteChanged(nextState.spriteDefs, spriteId,
+        cone.w, cone.h, cone.pixels, label)
+    packet.addBoardObject(objectId, player.x + box.offX,
+      player.y + box.offY, -900, MapLayerId, spriteId)
     ids.trackObject(objectId)
 
   # --- 1. the object pools ------------------------------------------------

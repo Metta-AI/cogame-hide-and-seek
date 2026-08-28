@@ -272,8 +272,8 @@ block theVisionConeStopsAtAWall:
     game.config.visionConeDeg, game.players[seeker].aimBrads, true)
   proc alphaAt(x, y: int): int =
     let
-      ox = game.players[seeker].x - cone.w div 2
-      oy = game.players[seeker].y - cone.h div 2
+      ox = game.players[seeker].x + cone.offX
+      oy = game.players[seeker].y + cone.offY
     if x - ox < 0 or y - oy < 0 or x - ox >= cone.w or y - oy >= cone.h:
       return 0
     int(cone.pixels[((y - oy) * cone.w + (x - ox)) * 4 + 3])
