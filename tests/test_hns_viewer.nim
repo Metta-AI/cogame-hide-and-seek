@@ -9,11 +9,12 @@ import hns/[sim_types, labels, broadcast, global]
 
 const
   ChromeCommonSha =
-    "7ace7287e0d19bf0fddb2362c55e4d76dfb44adcd4fbc8d1743b0557ced72f7c"
-    ## coworld-ctf's `client/chrome_common.js`, byte for byte. Everything this
-    ## game adds lives in the appended block below the splice banner; this
-    ## file is NOT edited and NOT reformatted.
-  ChromeCommonBytes = 40022
+    "9468c4b7fc1742146139224468eb3f68b7e9a8451e0319d1f6397146490aad2d"
+    ## coworld-ctf's `client/chrome_common.js` plus the fleet-wide replay
+    ## transport patch (0.5x speed chip + the game's own WIRE global).
+    ## Everything else this game adds lives in the appended block below the
+    ## splice banner; the file is otherwise NOT edited and NOT reformatted.
+  ChromeCommonBytes = 40037
   SpliceBanner =
     "HIDE-AND-SEEK additions to the inherited coworld-ctf chrome"
 
