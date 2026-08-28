@@ -85,6 +85,40 @@ block grab:
   check game.players[0].holding < 0, "releasing C did not drop the crate"
   check game.objects[obj].heldBy == -1, "the crate kept its holder"
 
+block aPhaseChangeAndAGameEndDropTheHeldObject:
+  ## Tick step 4: "`C` released (or … or the phase changed, or the game
+  ## ended) -> the held object is dropped". A hider may not carry a crate
+  ## across the release.
+  proc grabTheCrate(game: var SimServer): seq[InputState] =
+    let target = game.objects[0]
+    game.placePlayer(0, target.x - PlayerHalf - 8, target.y + target.h div 2)
+    game.players[0].aimBrads = 0
+    result = newSeq[InputState](game.players.len)
+    result[0].c = true
+    game.step(result, newSeq[InputState](game.players.len))
+    check game.players[0].holding == 0, "the fixture never took the crate"
+
+  block:
+    var game = newTestSim()
+    game.seatAll()
+    game.startGame()
+    var held = game.grabTheCrate()
+    # Hold C right through the prep -> hunt transition.
+    while game.matchPhase == phasePrep:
+      game.step(held, held)
+    check game.players[0].holding < 0,
+      "the release did not drop the held crate: a hider carried it into the hunt"
+    check game.objects[0].heldBy == -1, "the crate kept its holder at the release"
+
+  block:
+    var game = newTestSim()
+    game.seatAll()
+    game.startGame()
+    var held = game.grabTheCrate()
+    game.finishGame(timeLimitReached = true)
+    check game.players[0].holding < 0, "the game end did not drop the held crate"
+    check game.objects[0].heldBy == -1, "the crate kept its holder at the game end"
+
 block grabTieGoesToLowerSlot:
   var game = newTestSim()
   game.seatAll()

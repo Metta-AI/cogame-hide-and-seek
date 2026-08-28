@@ -330,8 +330,23 @@ proc startGame*(sim: var SimServer) =
 proc episodeComplete*(sim: SimServer): bool {.inline.} =
   sim.gameMargins.len >= sim.config.maxGames
 
+proc dropAllHeld*(sim: var SimServer) =
+  ## Tick step 4's other two triggers: "`C` released ... OR THE PHASE CHANGED,
+  ## OR THE GAME ENDED -> the held object is dropped". Without this a hider
+  ## carries a crate across the release and into the hunt, and a game ends with
+  ## furniture still bound to a cog. Inside the sim, so record and playback
+  ## drop on the same tick.
+  for slot in 0 ..< sim.players.len:
+    let held = sim.players[slot].holding
+    if held < 0 or held >= sim.objects.len:
+      continue
+    sim.emitEvent(Drop, source = slot, subject = sim.objects[held].id)
+    sim.dropObject(slot)
+    sim.players[slot].pushBlockedTicks = 0
+
 proc finishGame*(sim: var SimServer, timeLimitReached = true) =
   ## Files the game and either swaps sides for game 2 or ends the episode.
+  sim.dropAllHeld()
   sim.archiveGame()
   sim.timeLimitReached = timeLimitReached
   sim.logGameEvent("game " & $sim.gameMargins.len & " over: margin " &
@@ -526,6 +541,7 @@ proc step*(
   if sim.matchPhase == phasePrep and tick >= sim.config.prepTicks:
     sim.matchPhase = phaseHunt
     sim.releaseEmitted = true
+    sim.dropAllHeld()
     sim.emitEvent(Release, amount = sim.tickCount)
     sim.invalidateFovCaches()
     discard sim.scanSealed()
