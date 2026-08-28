@@ -149,6 +149,23 @@ jobs:
           done
           exit "${fail}"
 
+      - name: Execute the broadcast page's script blocks
+        # tools/ci/page_smoke.mjs runs the page's own <script> blocks against a
+        # DOM stub and fails on the first missing global -- the ReferenceError
+        # class a delete-heavy fork of a 4 000-line page produces. It was
+        # reachable only through tests/test_hns_viewer.nim, which SKIPS itself
+        # when `node` is absent, so its coverage depended on a runner detail.
+        run: node tools/ci/page_smoke.mjs
+
+      - name: Validate the manifest under the installed coworld CLI
+        # The note's test 34. `coworld build` runs only in coworld-release.yml,
+        # i.e. at release time: until this step, nothing in CI ran the
+        # platform's OWN validator over the template.
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet "coworld==0.1.43" pyyaml
+          python3 tools/ci/validate_manifest.py
+
       - name: Re-run the baseline tuning sweep
         # The six baseline tunables are a SWEPT pick, not guesses
         # (prompts/30-review-loop.md item 7). `--check` replays the whole grid
@@ -331,6 +348,22 @@ jobs:
             --timeout 90 \
             --soak 10 \
             --strict-text-bounds
+
+      - name: Step the emitted wasm module over the smoke replay
+        # The note's test 45. The native shards run 64-bit, where Nim `int` is
+        # 64 bits and multi-GB allocations succeed; the shipped viewer is
+        # wasm32, where `int` is 32 bits and the address space ends at 2 GB.
+        # Both classes of bug have reached prod invisible to CI. The script was
+        # committed but never invoked by any workflow.
+        run: |
+          set -euo pipefail
+          replay=""
+          for candidate in dist/smoke/*.replay dist/smoke/replay.json; do
+            if [ -f "${candidate}" ]; then replay="${candidate}"; break; fi
+          done
+          test -n "${replay}" || {
+            echo "::error::no replay in dist/smoke for the wasm smoke"; exit 1; }
+          node tools/wasm_replay_smoke.cjs dist/static-replay-viewer "${replay}"
 
       - name: Upload the viewer smoke evidence
         # Always: the screenshot and the JSON are most useful when the job is red.
