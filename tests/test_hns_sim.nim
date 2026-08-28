@@ -232,36 +232,123 @@ block keepClear:
     check not game.keepClearViolated(objectRect(obj)),
       "the deal placed " & obj.id & " inside a keep-clear disc"
 
-# --- 7. vault --------------------------------------------------------------
-block vault:
+block noSequenceOfPushesReachesASeekerPad:
+  ## The note's test 6 asks about PUSHES, not placements: the loop above can
+  ## never fail, because `canPlaceObject` calls `keepClearViolated` itself
+  ## (objects.nim:317). This walks each object toward a seeker pad through the
+  ## SAME guard the push path uses, one pixel at a time, and asserts the disc
+  ## actually STOPS it — the object ends outside every disc no matter how many
+  ## pushes it is given.
   var game = newTestSim()
   game.seatAll()
   game.startGame()
-  var ramp = -1
-  for i, o in game.objects:
-    if o.kind == okRamp:
-      ramp = i
+  proc rectDistSqTo(rect: MapRect, px, py: int): int =
+    ## The keep-clear rule's own measure (objects.nim's private rectDistSq):
+    ## squared distance from a point to the nearest pixel of a rectangle.
+    var dx, dy = 0
+    if px < rect.x: dx = rect.x - px
+    elif px >= rect.x + rect.w: dx = px - (rect.x + rect.w - 1)
+    if py < rect.y: dy = rect.y - py
+    elif py >= rect.y + rect.h: dy = py - (rect.y + rect.h - 1)
+    dx * dx + dy * dy
+  var rng = initRand(6)
+  let pads = game.gameMap.padsFor(anchorSeekers)
+  check pads.len == SeekerPads, "the room published no seeker pads"
+  for attempt in 1 .. 200:
+    let
+      index = rng.rand(game.objects.len - 1)
+      pad = pads[rng.rand(pads.len - 1)]
+    for push in 1 .. 400:
+      let centre = objectCenter(game.objects[index])
+      let
+        dx = cmp(pad.x, centre.x)
+        dy = cmp(pad.y, centre.y)
+      if dx == 0 and dy == 0:
+        break
+      var rect = objectRect(game.objects[index])
+      rect.x += dx
+      rect.y += dy
+      if not game.canPlaceObject(index, rect, -1):
+        break
+      game.moveObject(index, dx, dy)
+      check not game.keepClearViolated(objectRect(game.objects[index])),
+        "push " & $push & " of attempt " & $attempt & " put " &
+        game.objects[index].id & " inside a keep-clear disc"
+    check rectDistSqTo(objectRect(game.objects[index]), pad.x, pad.y) >=
+        game.config.keepClearPx * game.config.keepClearPx,
+      "pushing " & game.objects[index].id &
+      " straight at a seeker pad reached inside the disc"
+  # And a real push through the sim agrees: a cog holding an object cannot
+  # walk it into the disc either.
+  let pad = pads[0]
+  var held = -1
+  var bestDist = high(int)
+  for i in 0 ..< game.objects.len:
+    let d = rectDistSqTo(objectRect(game.objects[i]), pad.x, pad.y)
+    if d < bestDist:
+      bestDist = d
+      held = i
+  let obj = game.objects[held]
+  game.placePlayer(0, clamp(obj.x - PlayerHalf - 2, PlayerHalf,
+    MapWidth - PlayerHalf - 1), obj.y + obj.h div 2)
+  game.objects[held].heldBy = 0
+  game.players[0].holding = held
+  var drive = newSeq[InputState](game.players.len)
+  drive[0].right = pad.x > obj.x
+  drive[0].left = pad.x < obj.x
+  drive[0].down = pad.y > obj.y
+  drive[0].up = pad.y < obj.y
+  drive[0].c = true
+  for tick in 1 .. 200:
+    game.step(drive, drive)
+    for i in 0 ..< game.objects.len:
+      check not game.keepClearViolated(objectRect(game.objects[i])),
+        "a driven push put " & game.objects[i].id & " inside a keep-clear disc"
+
+# --- 7. vault --------------------------------------------------------------
+block vault:
+  # The launch/airborne/landing assertions used to sit inside
+  # `if game.vaultSpanClear(...)`, so a seeded deal that offered no clear span
+  # asserted NOTHING and still printed ok. Search the three rooms for a ramp
+  # that does offer one, and fail if none of them does.
+  var
+    game = newTestSim()
+    ramp = -1
+    brads = 0
+    found = false
+  for room in ["warren", "atrium", "long_hall"]:
+    game = newTestSim(%*{"roomPool": room, "seed": 42})
+    game.seatAll()
+    game.startGame()
+    for i, o in game.objects:
+      if o.kind != okRamp:
+        continue
+      game.placePlayer(0, o.x + o.w div 2, o.y + o.h div 2)
+      let head = rampHeadBrads(o, game.players[0].x, game.players[0].y)
+      if game.vaultSpanClear(game.players[0].x, game.players[0].y, head,
+          game.config.vaultSpanPx):
+        ramp = i
+        brads = head
+        found = true
+        break
+    if found:
       break
-  check ramp >= 0, "no ramp in the deal"
-  let r = game.objects[ramp]
-  game.placePlayer(0, r.x + r.w div 2, r.y + r.h div 2)
-  let brads = rampHeadBrads(r, game.players[0].x, game.players[0].y)
+  check found, "no ramp in any of the three rooms offers a clear vault span"
   let unit = AimUnit[brads]
   game.players[0].velX = unit.x * game.config.maxSpeed div AimUnitScale
   game.players[0].velY = unit.y * game.config.maxSpeed div AimUnitScale
-  if game.vaultSpanClear(game.players[0].x, game.players[0].y, brads,
-      game.config.vaultSpanPx):
-    var inputs = newSeq[InputState](game.players.len)
+  var inputs = newSeq[InputState](game.players.len)
+  game.step(inputs, inputs)
+  check game.players[0].airborne, "a full-speed run up a ramp did not launch"
+  check game.objects[ramp].kind == okRamp, "the launch object is not a ramp"
+  var airborneTicks = 0
+  while game.players[0].airborne and airborneTicks < 40:
     game.step(inputs, inputs)
-    check game.players[0].airborne, "a full-speed run up a ramp did not launch"
-    var airborneTicks = 0
-    while game.players[0].airborne and airborneTicks < 40:
-      game.step(inputs, inputs)
-      inc airborneTicks
-    check airborneTicks <= game.config.vaultTicks + 1,
-      "the vault lasted " & $airborneTicks & " ticks"
-    check game.canOccupy(game.players[0].x, game.players[0].y),
-      "the vault landed inside geometry"
+    inc airborneTicks
+  check airborneTicks <= game.config.vaultTicks + 1,
+    "the vault lasted " & $airborneTicks & " ticks"
+  check game.canOccupy(game.players[0].x, game.players[0].y),
+    "the vault landed inside geometry"
   # A too-thick span never triggers.
   check not game.vaultSpanClear(game.players[0].x, game.players[0].y, brads, 0),
     "a zero-thickness allowance still triggered a vault"
@@ -344,6 +431,69 @@ block sealedScan:
   discard game.scanSealed()
   check not game.players[hider].sealed,
     "a hider standing in the middle of the room reads as sealed"
+
+block aWalledInHiderIsSealedAndOnlyWhileTheWallHolds:
+  ## The note's test 11: the walled-in POSITIVE case, the same wall unlocked,
+  ## the cog-sized gap, and "only at turn boundaries". The old block asserted
+  ## only the negative case.
+  var game = newTestSim()
+  game.seatAll()
+  game.startGame()
+  # `warren`'s region r1 (16,16 232x176) has exactly one door, d1 at (256,104),
+  # 56 px tall. A hider-locked 32x128 panel laid over it seals the region.
+  var panel = -1
+  for i, obj in game.objects:
+    if obj.id == "pan2":
+      panel = i
+  check panel >= 0, "the warren deal no longer carries pan2"
+  proc placeWall(game: var SimServer, y: int, locked: LockOwner) =
+    game.objects[panel].x = 248
+    game.objects[panel].y = y
+    game.objects[panel].lockedBy = locked
+    game.rasterizeObjects()
+  for slot in 0 ..< game.players.len:
+    if game.players[slot].team == Red:
+      game.placePlayer(slot, 120, 100)      # inside r1
+    else:
+      game.placePlayer(slot, 600, 300)      # inside r6, the far corner
+  # 1. Walled in by a HIDER-LOCKED object: sealed.
+  game.placeWall(72, lockHiders)
+  let sealedChange = game.scanSealed()
+  check game.players[0].sealed, "a hider walled into r1 does not read as sealed"
+  check game.sealedCount() == 3, "the whole hiding trio in r1 is not sealed"
+  check 0 in sealedChange.sealed, "the scan reported no sealed transition"
+  # 2. The SAME wall unlocked: a seeker can shove it, so it is not a wall.
+  game.placeWall(72, lockNone)
+  let unsealedChange = game.scanSealed()
+  check not game.players[0].sealed,
+    "an UNLOCKED object still sealed the fort: a seeker can shove it"
+  check 0 in unsealedChange.unsealed, "the scan reported no unsealed transition"
+  # 3. Locked again, but shifted to leave a cog-sized gap in the doorway.
+  game.placeWall(112, lockHiders)
+  discard game.scanSealed()
+  check not game.players[0].sealed,
+    "a doorway with a cog-sized gap left in it still read as sealed"
+  # 4. The scan runs only at turn boundaries: closing the wall mid-turn does
+  #    not change `sealed` until the next boundary tick.
+  game.placeWall(72, lockHiders)
+  let turnTicks = game.config.turnTicks
+  check turnTicks > 2, "the fixture has no room inside a turn"
+  var inputs = newSeq[InputState](game.players.len)
+  var ticksToBoundary = 0
+  while (game.gameTick() + 1) mod turnTicks != 0:
+    game.step(inputs, inputs)
+    inc ticksToBoundary
+    check not game.players[0].sealed,
+      "the sealed scan ran mid-turn, at tick " & $game.gameTick()
+    for slot in 0 ..< game.players.len:
+      if game.players[slot].team == Red:
+        game.placePlayer(slot, 120, 100)
+      else:
+        game.placePlayer(slot, 600, 300)
+  check ticksToBoundary > 0, "the fixture never spent a tick inside a turn"
+  game.step(inputs, inputs)
+  check game.players[0].sealed,
+    "the turn-boundary scan did not pick the sealed fort up"
 
 # --- 12. scoring -----------------------------------------------------------
 block scoringFormula:
