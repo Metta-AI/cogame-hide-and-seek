@@ -134,6 +134,51 @@ block anUnreachableTargetDegradesToWatch:
   check game.canOccupy(game.players[0].x, game.players[0].y),
     "the cog ended up inside geometry chasing an unreachable target"
 
+# --- knownEnemy reports a sighting, and the chase that reads it -------------
+block knownEnemyReportsASighting:
+  var game = newTestSim()
+  game.seatAll()
+  game.startGame()
+  game.matchPhase = phaseHunt
+  var ctl = initControlState(game)
+  # A hider (slot 0, Red) and a seeker (slot 1, Blue) nose to nose, inside the
+  # omnidirectional vision bubble, so the sighting does not depend on aim.
+  let spot = game.nearestWalkable(MapWidth div 2, MapHeight div 2)
+  game.placePlayer(0, spot.x, spot.y)
+  let near = game.nearestWalkable(spot.x + PlayerHalf * 2 + 2, spot.y)
+  game.placePlayer(1, near.x, near.y)
+  check distSq(game.players[0].x, game.players[0].y,
+               game.players[1].x, game.players[1].y) <=
+      VisionBubble * VisionBubble,
+    "the two cogs are not inside the vision bubble; the fixture is wrong"
+  discard game.refreshPlayerFov(0)
+  discard game.refreshPlayerFov(1)
+  check game.playerVisibleTo(1, 0), "the seeker cannot see the hider"
+  ctl.observeEnemies(game)
+  let seen = ctl.knownEnemy(game, 1)
+  check seen.known, "knownEnemy reported no enemy for a cog looking at one"
+  check seen.index == 0, "knownEnemy named the wrong cog: " & $seen.index
+  check seen.x == game.players[0].x and seen.y == game.players[0].y,
+    "knownEnemy did not carry the sighted position"
+  check seen.ticksAgo == 0, "a sighting this tick was not reported as fresh"
+  # The seeker baseline turns that sighting into a chase, and the chase's goal
+  # is the enemy, not the seeker's own feet.
+  let order = baselineOrder(blBurrow, game, ctl, 1, game.cogAlias(1), 3)
+  check order.intent == intChase,
+    "burrow's seeker did not chase an enemy inside chaseRadius: " & $order.intent
+  let goal = ctl.goalFor(game, order, 1)
+  check goal.x == seen.x and goal.y == seen.y,
+    "the chase goal degenerated to the seeker's own position"
+  # And the memory expires: HuntMemoryTicks later, with no fresh observation,
+  # the same cog knows nothing.
+  var prev = newSeq[InputState](game.players.len)
+  let inputs = newSeq[InputState](game.players.len)
+  for tick in 0 .. HuntMemoryTicks:
+    game.step(inputs, prev)
+    prev = inputs
+  check not ctl.knownEnemy(game, 1).known,
+    "a sighting older than HuntMemoryTicks was still reported as known"
+
 # --- 22. the fallback IS the burrow proc -----------------------------------
 block fallbackIsTheBurrowProc:
   var game = newTestSim()

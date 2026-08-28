@@ -336,6 +336,8 @@ proc knownEnemy*(
   let age = sim.tickCount - ctl.lastSeenTick[cogIndex]
   if age > HuntMemoryTicks or ctl.lastSeenIndex[cogIndex] < 0:
     return (false, 0, 0, -1, 0)
+  (true, ctl.lastSeenX[cogIndex], ctl.lastSeenY[cogIndex],
+   ctl.lastSeenIndex[cogIndex], age)
 
 # ---------------------------------------------------------------------------
 # The driver: what each intent does, and how it finishes.
