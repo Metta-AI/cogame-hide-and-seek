@@ -375,6 +375,28 @@ block scoringIsZeroSum:
         "scorePermille out of range: " & $score
       total += score
     check total == 0, "the six scores summed to " & $total & ", not 0"
+    # `win` IS the sign of the score, and nothing else (note test 12). Read it
+    # off the emitted results document, which is what the league reads.
+    let results = parseJson(game.roomResultsJson())
+    for slot in 0 ..< 6:
+      check results{"win"}[slot].getBool() == (game.scorePermille(slot) > 0),
+        "results.win[" & $slot & "] disagrees with the sign of its score"
+
+block anAllZeroMarginLeavesEveryWinFalse:
+  ## The other half of test 12: a drawn episode has no winners, not six.
+  var game = newTestSim()
+  game.seatAll()
+  for g in 0 .. 1:
+    game.gameMargins.add(0)
+    game.gameHidden.add(360)
+    game.gameSeen.add(360)
+    game.gameHuntPlayed.add(720)
+  let results = parseJson(game.roomResultsJson())
+  for slot in 0 ..< 6:
+    check game.scorePermille(slot) == 0,
+      "an all-zero margin scored " & $game.scorePermille(slot) & " at slot " & $slot
+    check not results{"win"}[slot].getBool(),
+      "an all-zero margin left slot " & $slot & " marked a winner"
 
 # --- 13. end conditions ----------------------------------------------------
 block endConditions:
