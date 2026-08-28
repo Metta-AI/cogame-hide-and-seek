@@ -1,0 +1,505 @@
+{
+  "t": 185,
+  "mt": 900,
+  "ph": "playing",
+  "mp": "hunt",
+  "lob": 0,
+  "pl": true,
+  "sp": 1,
+  "mx": 900,
+  "st": 0,
+  "lp": false,
+  "sk": false,
+  "ff": false,
+  "en": true,
+  "mm": -1,
+  "bs": 2,
+  "game": 1,
+  "games": 2,
+  "turn": 3,
+  "turns": 5,
+  "phaseLeft": 11,
+  "room": "warren",
+  "hidden": 184,
+  "seen": 0,
+  "margin": 1000,
+  "sealed": 3,
+  "hiders": 3,
+  "lockedHiders": 2,
+  "lockedSeekers": 1,
+  "rampsLocked": 0,
+  "ramps": 2,
+  "objects": [
+    {
+      "id": "box1",
+      "kind": "crate",
+      "box": [
+        525,
+        93,
+        64,
+        64
+      ],
+      "locked": "hiders",
+      "held": false
+    },
+    {
+      "id": "box2",
+      "kind": "crate",
+      "box": [
+        144,
+        232,
+        64,
+        64
+      ],
+      "locked": "hiders",
+      "held": false
+    },
+    {
+      "id": "box3",
+      "kind": "crate",
+      "box": [
+        368,
+        296,
+        64,
+        64
+      ],
+      "locked": "seekers",
+      "held": false
+    },
+    {
+      "id": "box4",
+      "kind": "crate",
+      "box": [
+        144,
+        312,
+        64,
+        64
+      ],
+      "locked": "none",
+      "held": false
+    },
+    {
+      "id": "pan1",
+      "kind": "panel",
+      "box": [
+        152,
+        85,
+        128,
+        32
+      ],
+      "locked": "none",
+      "held": false
+    },
+    {
+      "id": "pan2",
+      "kind": "panel",
+      "box": [
+        284,
+        236,
+        32,
+        128
+      ],
+      "locked": "none",
+      "held": false
+    },
+    {
+      "id": "ramp1",
+      "kind": "ramp",
+      "box": [
+        60,
+        224,
+        40,
+        80
+      ],
+      "locked": "none",
+      "held": false
+    },
+    {
+      "id": "ramp2",
+      "kind": "ramp",
+      "box": [
+        136,
+        132,
+        80,
+        40
+      ],
+      "locked": "none",
+      "held": false
+    }
+  ],
+  "teams": {
+    "red": {
+      "role": "hiders",
+      "seen": 0,
+      "unseen": 552,
+      "locked": 2,
+      "sealed": 3,
+      "exposed": false,
+      "policies": []
+    },
+    "blue": {
+      "role": "seekers",
+      "seen": 0,
+      "unseen": 552,
+      "locked": 1,
+      "sealed": 0,
+      "exposed": false,
+      "policies": []
+    }
+  },
+  "roster": [
+    {
+      "s": 0,
+      "team": "red",
+      "alias": "HIDER-alpha",
+      "name": "Seat 1",
+      "pol": "Seat 1",
+      "kind": "",
+      "seen": 0,
+      "unseen": 184,
+      "locks": 1,
+      "vaults": 0,
+      "fb": 0,
+      "holding": "",
+      "sealed": true
+    },
+    {
+      "s": 1,
+      "team": "blue",
+      "alias": "SEEKER-alpha",
+      "name": "Seat 2",
+      "pol": "Seat 2",
+      "kind": "",
+      "seen": 0,
+      "unseen": 184,
+      "locks": 0,
+      "vaults": 0,
+      "fb": 0,
+      "holding": "",
+      "sealed": false
+    },
+    {
+      "s": 2,
+      "team": "red",
+      "alias": "HIDER-beta",
+      "name": "Seat 3",
+      "pol": "Seat 3",
+      "kind": "",
+      "seen": 0,
+      "unseen": 184,
+      "locks": 0,
+      "vaults": 0,
+      "fb": 0,
+      "holding": "",
+      "sealed": true
+    },
+    {
+      "s": 3,
+      "team": "blue",
+      "alias": "SEEKER-beta",
+      "name": "Seat 4",
+      "pol": "Seat 4",
+      "kind": "",
+      "seen": 0,
+      "unseen": 184,
+      "locks": 0,
+      "vaults": 0,
+      "fb": 0,
+      "holding": "",
+      "sealed": false
+    },
+    {
+      "s": 4,
+      "team": "red",
+      "alias": "HIDER-gamma",
+      "name": "Seat 5",
+      "pol": "Seat 5",
+      "kind": "",
+      "seen": 0,
+      "unseen": 184,
+      "locks": 1,
+      "vaults": 0,
+      "fb": 0,
+      "holding": "",
+      "sealed": true
+    },
+    {
+      "s": 5,
+      "team": "blue",
+      "alias": "SEEKER-gamma",
+      "name": "Seat 6",
+      "pol": "Seat 6",
+      "kind": "",
+      "seen": 0,
+      "unseen": 184,
+      "locks": 0,
+      "vaults": 0,
+      "fb": 0,
+      "holding": "",
+      "sealed": false
+    }
+  ],
+  "pov": -1,
+  "events": [
+    {
+      "k": "lock",
+      "object": "box2",
+      "team": "hiders",
+      "tick": 185
+    },
+    {
+      "k": "lock",
+      "object": "box3",
+      "team": "seekers",
+      "tick": 185
+    },
+    {
+      "k": "unlock",
+      "object": "pan1",
+      "team": "hiders",
+      "tick": 185
+    },
+    {
+      "k": "vault",
+      "slot": 1,
+      "alias": "SEEKER-alpha",
+      "from": [
+        385,
+        103
+      ],
+      "to": [
+        385,
+        103
+      ],
+      "ok": true,
+      "tick": 185
+    },
+    {
+      "k": "say",
+      "slot": 0,
+      "alias": "HIDER-alpha",
+      "text": "WWWWWWWWWW",
+      "x": 201,
+      "y": 69,
+      "tick": 185
+    },
+    {
+      "k": "say",
+      "slot": 1,
+      "alias": "SEEKER-alpha",
+      "text": "MMMMMMMMMM",
+      "x": 385,
+      "y": 103,
+      "tick": 185
+    },
+    {
+      "k": "say",
+      "slot": 2,
+      "alias": "HIDER-beta",
+      "text": "@@@@@@@@@@",
+      "x": 233,
+      "y": 228,
+      "tick": 185
+    },
+    {
+      "k": "say",
+      "slot": 3,
+      "alias": "SEEKER-beta",
+      "text": "0000000000",
+      "x": 271,
+      "y": 244,
+      "tick": 185
+    },
+    {
+      "k": "say",
+      "slot": 4,
+      "alias": "HIDER-gamma",
+      "text": "iiiiiiiiii",
+      "x": 598,
+      "y": 135,
+      "tick": 185
+    },
+    {
+      "k": "say",
+      "slot": 5,
+      "alias": "SEEKER-gamma",
+      "text": "WWWWMMMM@@",
+      "x": 583,
+      "y": 291,
+      "tick": 185
+    },
+    {
+      "k": "sealed",
+      "hiders": 3,
+      "alias": "HIDER-alpha",
+      "tick": 185
+    },
+    {
+      "k": "sealed",
+      "hiders": 3,
+      "alias": "HIDER-beta",
+      "tick": 185
+    },
+    {
+      "k": "sealed",
+      "hiders": 3,
+      "alias": "HIDER-gamma",
+      "tick": 185
+    }
+  ],
+  "directives": [
+    {
+      "k": "directive",
+      "game": 1,
+      "turn": 3,
+      "slot": 0,
+      "alias": "HIDER-alpha",
+      "source": "llm",
+      "latency_ms": 1234,
+      "intent": "hide",
+      "object": "",
+      "at": "p1",
+      "say": "WWWWWWWWWW",
+      "radio": "seat 0 radio WMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWM[0]",
+      "result": "",
+      "to": null
+    },
+    {
+      "k": "directive",
+      "game": 1,
+      "turn": 3,
+      "slot": 1,
+      "alias": "SEEKER-alpha",
+      "source": "llm",
+      "latency_ms": 1234,
+      "intent": "hide",
+      "object": "",
+      "at": "p1",
+      "say": "MMMMMMMMMM",
+      "radio": "seat 1 radio WMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWM[1]",
+      "result": "",
+      "to": null
+    },
+    {
+      "k": "directive",
+      "game": 1,
+      "turn": 3,
+      "slot": 2,
+      "alias": "HIDER-beta",
+      "source": "llm",
+      "latency_ms": 1234,
+      "intent": "hide",
+      "object": "",
+      "at": "p1",
+      "say": "@@@@@@@@@@",
+      "radio": "seat 2 radio WMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWM[2]",
+      "result": "",
+      "to": null
+    },
+    {
+      "k": "directive",
+      "game": 1,
+      "turn": 3,
+      "slot": 3,
+      "alias": "SEEKER-beta",
+      "source": "llm",
+      "latency_ms": 1234,
+      "intent": "hide",
+      "object": "",
+      "at": "p1",
+      "say": "0000000000",
+      "radio": "seat 3 radio WMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWM[3]",
+      "result": "",
+      "to": null
+    },
+    {
+      "k": "directive",
+      "game": 1,
+      "turn": 3,
+      "slot": 4,
+      "alias": "HIDER-gamma",
+      "source": "llm",
+      "latency_ms": 1234,
+      "intent": "hide",
+      "object": "",
+      "at": "p1",
+      "say": "iiiiiiiiii",
+      "radio": "seat 4 radio WMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWM[4]",
+      "result": "",
+      "to": null
+    },
+    {
+      "k": "directive",
+      "game": 1,
+      "turn": 3,
+      "slot": 5,
+      "alias": "SEEKER-gamma",
+      "source": "llm",
+      "latency_ms": 1234,
+      "intent": "hide",
+      "object": "",
+      "at": "p1",
+      "say": "WWWWMMMM@@",
+      "radio": "seat 5 radio WMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWM[5]",
+      "result": "",
+      "to": null
+    }
+  ],
+  "ribbon": [
+    180,
+    9,
+    0,
+    9,
+    1,
+    9,
+    0,
+    9,
+    1,
+    9,
+    0,
+    9,
+    1,
+    9,
+    0,
+    9,
+    1,
+    9,
+    0,
+    9,
+    1,
+    9,
+    0,
+    9,
+    1,
+    9,
+    0,
+    9,
+    1,
+    9,
+    0,
+    9,
+    1,
+    9,
+    0,
+    9,
+    1,
+    9,
+    0,
+    9,
+    1,
+    9,
+    0,
+    9,
+    1,
+    9,
+    0,
+    9,
+    1
+  ],
+  "lulls": [
+    [
+      10,
+      40
+    ]
+  ]
+}

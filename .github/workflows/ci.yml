@@ -341,3 +341,76 @@ jobs:
           path: dist/static-replay-viewer
           if-no-files-found: error
           retention-days: 14
+
+  # ---------------------------------------------------------------------
+  # The worst-case renderer fixture (checklist item 15's final bullet, design
+  # note test 44).
+  #
+  # docker_smoke.sh runs with NO ANTHROPIC_API_KEY, so every seat in the only
+  # replay CI can produce plays scripted: `scatter` says nothing and `burrow`
+  # says at most one five-character line per game, and neither ever emits a
+  # `radio`. The wasm-viewer smoke above therefore never draws a speech bubble
+  # or a remark row -- the whole class of chrome that exists to show what a
+  # model said is untested by every gate in this file. cogchemists (2026-08-24)
+  # shipped four clipped speech bubbles with a fully green board for exactly
+  # that reason.
+  #
+  # tools/ci/renderer_fixture.html loads the REAL client/replay_broadcast.html
+  # (the bytes the bundle's index.html is spliced from), shims only the wasm
+  # entry, and hands it tools/ci/renderer_fixture_state.json -- a frame built
+  # by the shipped src/hns/broadcast.nim off a real sim, with a full-cap
+  # 10-rune `say` on all six seats, a full-cap 96-rune `radio` on all six
+  # directives, three locked objects, a sealed fort, a vault in flight and a
+  # full exposure ribbon. It asserts, at 360/720/1280 px, that every one of
+  # those twelve strings reaches the DOM at FULL LENGTH and that no row
+  # carrying one crosses an edge of the frame, then sets data-replay-loaded /
+  # data-replay-error for the smoke to read.
+  # ---------------------------------------------------------------------
+  renderer-fixture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Playwright (pinned 1.55.0)
+        run: |
+          set -euo pipefail
+          npm install --no-save playwright@1.55.0
+          npx --yes playwright@1.55.0 install --with-deps chromium
+
+      - name: Render a full-cap remark on every seat
+        run: |
+          set -euo pipefail
+          mkdir -p dist/renderer-fixture
+          # Served over HTTP, not file://: the fixture fetches the page and the
+          # frame, and fetch() on a file:// origin is blocked.
+          python3 -m http.server 8099 --bind 127.0.0.1 >/dev/null 2>&1 &
+          server=$!
+          trap 'kill "${server}" 2>/dev/null || true' EXIT
+          for _ in $(seq 1 40); do
+            if curl -fsS -o /dev/null http://127.0.0.1:8099/tools/ci/renderer_fixture.html; then
+              break
+            fi
+            sleep 0.25
+          done
+          curl -fsS -o /dev/null http://127.0.0.1:8099/tools/ci/renderer_fixture.html
+          node tools/ci/viewer_smoke.mjs \
+            --url "http://127.0.0.1:8099/tools/ci/renderer_fixture.html" \
+            --timeout 90 \
+            --strict-text-bounds \
+            --out dist/renderer-fixture
+
+      - name: Upload the renderer fixture evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: renderer-fixture
+          path: |
+            dist/renderer-fixture/viewer-smoke.png
+            dist/renderer-fixture/viewer-smoke.json
+          if-no-files-found: warn
+          retention-days: 14

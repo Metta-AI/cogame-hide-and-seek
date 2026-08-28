@@ -2796,6 +2796,22 @@ button.beat-marker {
 /* --- feed rows ---------------------------------------------------------- */
 .feed-row .hns-obj { color: var(--amber); font-family: var(--pixfont); }
 .feed-row .hns-say { color: var(--paper); font-style: italic; }
+/* A MODEL REMARK IS A SENTENCE, NOT A NAMEPLATE. The inherited kill-row rule
+   is `white-space: nowrap; max-width: none`, sized for a 10-char name and a
+   short badge; a full-cap 96-rune radio line drawn under it runs 64 px off the
+   LEFT edge of a 360 px featured-match frame (#killfeed is align-items:
+   flex-end, so a too-wide row grows leftward off the board). Measured, not
+   guessed: tools/ci/renderer_fixture.html drives this page with a full-cap say
+   and radio on all six seats at 360/720/1280 px and fails the build on a row
+   that crosses an edge. So a remark row gets a RESERVED BAND — the feed's own
+   width, which #stage.tiny already narrows — and wraps inside it. Widening the
+   band, never shortening the text (checklist item 15). */
+.feed-row.hns-remark {
+  white-space: normal;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
 #stage.tiny #killfeed .feed-row:nth-child(n+4) { display: none; }
 </style>
 <script>
@@ -2956,14 +2972,14 @@ button.beat-marker {
         feedRow('<span class="who ' + sideOf(s, e.slot) + '">' +
           CTX.esc(e.alias || cogName(s, e.slot)) + '</span>' +
           '<span class="glyph">:</span><span class="hns-say">&ldquo;' +
-          CTX.esc(e.text) + '&rdquo;</span>');
+          CTX.esc(e.text) + '&rdquo;</span>', 'hns-remark');
         return true;
       case 'radio':
         feedRow('<span class="who ' + sideOf(s, e.slot) + '">' +
           CTX.esc(String(sideOf(s, e.slot) || '').toUpperCase()) +
           ' radio</span><span class="glyph">:</span>' +
           '<span class="hns-say">&ldquo;' + CTX.esc(e.text) +
-          '&rdquo;</span>');
+          '&rdquo;</span>', 'hns-remark');
         return true;
       case 'fallback':
         hnsBeat(s, e.tick, 'fallback', '',
@@ -3004,7 +3020,7 @@ button.beat-marker {
         feedRow('<span class="who ' + side + '">' +
           CTX.esc(String(d.alias || '')) + '</span>' +
           '<span class="glyph">:</span><span class="hns-say">&ldquo;' +
-          CTX.esc(d.radio) + '&rdquo;</span>');
+          CTX.esc(d.radio) + '&rdquo;</span>', 'hns-remark');
       } else if (d.intent) {
         feedRow('<span class="who ' + side + '">' +
           CTX.esc(String(d.alias || '')) + '</span>' +

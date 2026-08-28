@@ -14,6 +14,7 @@ import
   test_hns_replay,
   test_hns_manifest,
   test_hns_viewer,
-  test_hns_endcard_labels
+  test_hns_endcard_labels,
+  test_hns_renderer_fixture
 
 echo "all tests: ok"
