@@ -481,7 +481,7 @@ proc buildTetherSprite(dx, dy: int): tuple[w, h: int, pixels: seq[uint8]] =
       rgba(236, 232, 210, 190))
   (w, h, pixels)
 
-proc buildShoutBubble(font: PixelFont, text: string):
+proc buildShoutBubble*(font: PixelFont, text: string):
     tuple[w, h: int, pixels: seq[uint8]] =
   ## The starter's chunky speech bubble, kept verbatim in shape: this is why
   ## `MaxSayRunes` stays at 10.
@@ -507,6 +507,35 @@ proc buildShoutBubble(font: PixelFont, text: string):
           pixels.putPixel(w, penX + gx, 4 + gy, rgba(24, 26, 34, 255))
     penX += glyph.width + font.spacing
   (w, h, pixels)
+
+const ShoutFloat = 6
+  ## px the flipped bubble floats BELOW the shouter's head when it does not
+  ## fit above.
+
+proc shoutBubblePlacement*(
+  sim: SimServer, anchorX, tailTipY, bubbleW, bubbleH: int
+): tuple[x, y: int] =
+  ## Where one speech bubble is PLACED, in map pixels, so that it is always
+  ## wholly inside the board — the frame every spectator client fits the whole
+  ## map into. The starter's proc (`src/ctf/global.nim:3950-3972`), ported.
+  ##
+  ## The bubble grows UPWARD from the shouter, and a cog can stand on the top
+  ## row of the arena — every committed room has `pocket` anchors at y = 40 and
+  ## `hide` parks hiders exactly on them. Placing the body at
+  ## `tailTipY - bubbleH` unclamped puts it at a negative y, where the map
+  ## layer canvas silently clips it and a sentence renders as a sliver. That is
+  ## the cogchemists defect of 2026-08-24 verbatim, and nothing in a load
+  ## signal, a soak or a screenshot can see it. So: if the bubble does not fit
+  ## above the tail tip it FLIPS below it (the tail is cosmetic; being read is
+  ## not), and either way both axes are clamped into the board rect.
+  let
+    maxX = max(0, sim.gameMap.width - bubbleW)
+    maxY = max(0, sim.gameMap.height - bubbleH)
+  result.x = clamp(anchorX - bubbleW div 2, 0, maxX)
+  result.y =
+    if tailTipY - bubbleH >= 0: tailTipY - bubbleH
+    else: tailTipY + ShoutFloat
+  result.y = clamp(result.y, 0, maxY)
 
 proc objectLabel(obj: GameObject): string =
   case obj.kind
@@ -673,11 +702,12 @@ proc buildSpriteProtocolUpdates*(
       art = buildShoutBubble(sim.shoutFont, shout.text)
       spriteId = ShoutSpriteBase + bubble
       objectId = ShoutObjectBase + bubble
+      place = sim.shoutBubblePlacement(
+        shout.x, shout.y - SoldierBodyPx, art.w, art.h)
     packet.addBoardSpriteChanged(nextState.spriteDefs, spriteId,
       art.w, art.h, art.pixels,
       LabelShoutBubble & " " & shout.text, changed = true)
-    packet.addBoardObject(objectId,
-      shout.x - art.w div 2, shout.y - SoldierBodyPx - art.h,
+    packet.addBoardObject(objectId, place.x, place.y,
       shout.y + 400, MapLayerId, spriteId)
     ids.trackObject(objectId)
     inc bubble

@@ -5,7 +5,7 @@
 import std/[algorithm, os, osproc, strutils]
 import crunchy
 import helpers
-import hns/[sim_types, labels, broadcast]
+import hns/[sim_types, labels, broadcast, global]
 
 const
   ChromeCommonSha =
@@ -218,5 +218,36 @@ block thePageExecutesWithNoMissingGlobals:
     let outcome = execCmdEx("node tools/ci/page_smoke.mjs")
     check outcome.exitCode == 0,
       "tools/ci/page_smoke.mjs failed:\n" & outcome.output
+
+block shoutBubblesStayInsideTheBoard:
+  ## The bubble is laid out RELATIVE to a cog (checklist 15): it grows upward
+  ## from the shouter's head, and the `hide` intent parks hiders on `pocket`
+  ## anchors that sit on the top row of every committed room. Placed
+  ## unclamped, the body lands at a negative y and the sentence renders as a
+  ## sliver — invisible to the load signal, the soak and the screenshot.
+  var game = newTestSim()
+  game.seatAll()
+  game.startGame()
+  const FullCap = "WWWWWWWWWW"   ## MaxSayRunes of the widest glyph.
+  check FullCap.len == MaxSayRunes, "the fixture is not a full-cap say"
+  let art = buildShoutBubble(game.shoutFont, FullCap)
+  var pockets = 0
+  var anchors = @[(0, 0), (game.gameMap.width - 1, 0),
+                  (0, game.gameMap.height - 1),
+                  (game.gameMap.width - 1, game.gameMap.height - 1),
+                  (game.gameMap.width div 2, game.gameMap.height div 2)]
+  for anchor in game.gameMap.anchors:
+    if anchor.kind == anchorPocket:
+      anchors.add((anchor.x, anchor.y))
+      inc pockets
+  check pockets > 0, "the room published no pocket anchors"
+  for (x, y) in anchors:
+    let place = game.shoutBubblePlacement(x, y - SoldierBodyPx, art.w, art.h)
+    check place.x >= 0 and place.y >= 0,
+      "a full-cap shout at (" & $x & "," & $y & ") was placed off the board " &
+      "at (" & $place.x & "," & $place.y & ")"
+    check place.x + art.w <= game.gameMap.width and
+      place.y + art.h <= game.gameMap.height,
+      "a full-cap shout at (" & $x & "," & $y & ") overran the board edge"
 
 echo "test_hns_viewer: ok"
