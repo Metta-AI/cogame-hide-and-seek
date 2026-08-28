@@ -250,4 +250,37 @@ block shoutBubblesStayInsideTheBoard:
       place.y + art.h <= game.gameMap.height,
       "a full-cap shout at (" & $x & "," & $y & ") overran the board edge"
 
+block theVisionConeStopsAtAWall:
+  ## Readout 2: the cone is "clipped by walls and objects exactly as the sim
+  ## clips it". The wedge used to be drawn unclipped and layered under the
+  ## objects — but a WALL is part of the baked room bed, not an object, so the
+  ## beam ran through walls and told the spectator a seeker could see through
+  ## them.
+  var game = newTestSim()
+  game.seatAll()
+  game.startGame()
+  game.matchPhase = phaseHunt
+  # warren: a seeker in r3 aimed WEST at the solid wall between r3 and r2.
+  # (The one door on that wall, d2, is at y = 104; y = 160 is masonry.)
+  let seeker = 1
+  game.placePlayer(seeker, 620, 160)
+  game.players[seeker].aimBrads = 128
+  check game.canOccupy(620, 160), "the fixture cog is standing in geometry"
+  check game.isWall(480, 160), "the fixture is not aimed at a wall"
+  discard game.refreshPlayerFov(seeker)
+  let cone = game.buildConeSprite(seeker, game.config.sightRange,
+    game.config.visionConeDeg, game.players[seeker].aimBrads, true)
+  proc alphaAt(x, y: int): int =
+    let
+      ox = game.players[seeker].x - cone.w div 2
+      oy = game.players[seeker].y - cone.h div 2
+    if x - ox < 0 or y - oy < 0 or x - ox >= cone.w or y - oy >= cone.h:
+      return 0
+    int(cone.pixels[((y - oy) * cone.w + (x - ox)) * 4 + 3])
+  check alphaAt(560, 160) > 0,
+    "the cone is not drawn on the near side of the wall"
+  check alphaAt(440, 160) == 0,
+    "the cone is drawn THROUGH a wall: it is not clipped as the sim clips it"
+  check alphaAt(300, 160) == 0, "the cone reaches two rooms through a wall"
+
 echo "test_hns_viewer: ok"

@@ -428,12 +428,23 @@ proc buildSpottedRingSprite(): seq[uint8] =
       if d2 <= outer * outer and d2 >= inner * inner:
         result.putPixel(n, x, y, rgba(236, 72, 60, 220))
 
-proc buildConeSprite(range, coneDeg, aimBrads: int,
+proc buildConeSprite*(sim: SimServer, playerIndex, range, coneDeg,
+                     aimBrads: int,
                      seeker: bool): tuple[w, h: int, pixels: seq[uint8]] =
   ## One cog's torch beam as a translucent wedge, drawn into a square canvas
-  ## centred on the cog. The sim clips the cone against walls and furniture;
-  ## the board draws the unclipped wedge UNDER the objects, so an object drawn
-  ## on top of it reads as the thing that stopped it.
+  ## centred on the cog, CLIPPED BY THE SIM'S OWN FOG (readout 2: "clipped by
+  ## walls and objects exactly as the sim clips it"). The wedge used to be
+  ## drawn unclipped and layered under the objects, on the argument that an
+  ## object drawn on top of it reads as the thing that stopped it — but a WALL
+  ## is part of the baked room bed, not an object, so a beam visibly ran
+  ## straight through walls and told the spectator the seeker could see
+  ## through them.
+  ##
+  ## The clip is a lookup into the cog's own fov cache, which the sim
+  ## refreshed this tick (`refreshPlayerFov`, tick step 9), so the drawn wedge
+  ## IS the sim's answer rather than a second implementation of it. An
+  ## unrefreshed cache reports everything visible, which degrades to exactly
+  ## the old unclipped wedge.
   let
     n = range * 2 + 2
     c = n div 2
@@ -445,6 +456,8 @@ proc buildConeSprite(range, coneDeg, aimBrads: int,
     half = float(coneDeg) * PI / 180.0
     (ax, ay) = aimVector(aimBrads)
     cosHalf = cos(half)
+    originX = sim.players[playerIndex].x
+    originY = sim.players[playerIndex].y
   for y in 0 ..< n:
     for x in 0 ..< n:
       let
@@ -454,6 +467,13 @@ proc buildConeSprite(range, coneDeg, aimBrads: int,
       if d2 > float(range * range) or d2 < 1.0:
         continue
       if vx * ax + vy * ay < cosHalf * sqrt(d2):
+        continue
+      let
+        mx = originX + x - c
+        my = originY + y - c
+      if mx < 0 or my < 0 or mx >= MapWidth or my >= MapHeight:
+        continue
+      if not sim.fovVisibleAt(playerIndex, mx, my):
         continue
       var shade = tint
       let fade = 1.0 - sqrt(d2) / float(range)
@@ -609,11 +629,16 @@ proc buildSpriteProtocolUpdates*(
       continue
     let
       seeker = player.team == Blue
-      cone = buildConeSprite(sim.config.sightRange, sim.config.visionConeDeg,
-        player.aimBrads, seeker)
+      cone = sim.buildConeSprite(i, sim.config.sightRange,
+        sim.config.visionConeDeg, player.aimBrads, seeker)
+      # The wedge is CLIPPED by this cog's fog, so its pixels depend on where
+      # the cog stands and on where the furniture stands — both belong in the
+      # dedup key, or a cog that walked without turning would keep the cone it
+      # had at its old spot.
       label = LabelVisionCone & " " & $slot & " aim " & $player.aimBrads &
         " deg " & $sim.config.visionConeDeg & " range " &
-        $sim.config.sightRange & " on"
+        $sim.config.sightRange & " at " & $player.x & "," & $player.y &
+        " geo " & $sim.geometryEpoch & " on"
     packet.addBoardSpriteChanged(nextState.spriteDefs, spriteId,
       cone.w, cone.h, cone.pixels, label)
     packet.addBoardObject(objectId, player.x - cone.w div 2,
