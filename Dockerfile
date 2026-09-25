@@ -1,8 +1,6 @@
 # Build Docker. ONE image, TWO entrypoints: /bin/hide-and-seek (the game
-# server) and /bin/hide-and-seek-player (the thin seat registrar). The whole
-# policy set is env-switched inside this same image (PLAYER_PROMPT vs
-# PLAYER_SCRIPTED), which is what keeps a champion and a scripted filler
-# byte-identical apart from their environment.
+# server) and /bin/hide-and-seek-player (the seat policy). Numeric and Jev
+# calls run in the player process. Prompt calls use the game-side LLM client.
 FROM debian:bookworm-slim AS build
 
 RUN apt-get update && \
@@ -46,7 +44,12 @@ RUN nim $NimCommand \
   $NimFlags \
   --nimcache:/tmp/hide-and-seek-player-nimcache \
   --out:hide-and-seek-player \
-  src/hide_and_seek_player.nim
+  src/hide_and_seek_player.nim && \
+  nim c \
+  $NimFlags \
+  --nimcache:/tmp/hide-and-seek-bridge-nimcache \
+  --out:hide-and-seek-bridge \
+  src/hns/numeric_bridge.nim
 
 # Run Docker.
 FROM debian:bookworm-slim
@@ -58,6 +61,7 @@ RUN apt-get update && \
 WORKDIR /workspace/hns
 COPY --from=build /workspace/hns/hide-and-seek /bin/hide-and-seek
 COPY --from=build /workspace/hns/hide-and-seek-player /bin/hide-and-seek-player
+COPY --from=build /workspace/hns/hide-and-seek-bridge /bin/hide-and-seek-bridge
 COPY --from=build /workspace/hns/*.json ./
 COPY --from=build /workspace/hns/data ./data
 COPY --from=build /workspace/hns/client ./client

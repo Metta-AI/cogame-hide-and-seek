@@ -30,6 +30,10 @@ type
     inputPressedMasks: Table[WebSocket, uint8]
     lastAppliedMasks: Table[WebSocket, uint8]
     chatMessages: Table[WebSocket, string]
+    pendingOrders: array[MaxPlayers, string]
+    orderResponses: array[MaxPlayers, string]
+    orderResponseAt: array[MaxPlayers, MonoTime]
+    orderDeadlines: array[MaxPlayers, MonoTime]
     playerIndices: Table[WebSocket, int]
     playerAddresses: Table[WebSocket, string]
     playerSlots: Table[WebSocket, int]
@@ -875,7 +879,14 @@ proc websocketHandler(
             appState.inputMasks[websocket] = mask
             appState.inputPressedMasks[websocket] = pressedMask
             if chatText.len > 0:
-              appState.chatMessages[websocket] = chatText
+              let slot = appState.playerSlots[websocket]
+              let prefix = "orders:" & appState.pendingOrders[slot] & ":"
+              if appState.pendingOrders[slot].len > 0 and
+                  chatText.startsWith(prefix):
+                appState.orderResponses[slot] = chatText[prefix.len .. ^1]
+                appState.orderResponseAt[slot] = getMonoTime()
+              else:
+                appState.chatMessages[websocket] = chatText
   of ErrorEvent, CloseEvent:
     var who = ""
     {.gcsafe.}:
@@ -1156,14 +1167,53 @@ proc declarePlayerFailure(slot: int, message: string) =
   except CatchableError as e:
     echo "player-failure declaration failed: ", e.msg
 
+proc dispatchExternal(turn, deadlineMs: int,
+                      requests: seq[ExternalRequest]) =
+  var sends: seq[tuple[ws: WebSocket, body: string]]
+  let deadline = getMonoTime() + initDuration(milliseconds = deadlineMs)
+  {.gcsafe.}:
+    withLock appState.lock:
+      for request in requests:
+        let seat = request.seat
+        appState.pendingOrders[seat] =
+          $request.view["game"].getInt() & ":" & $turn
+        appState.orderResponses[seat] = ""
+        appState.orderDeadlines[seat] = deadline
+        for websocket, slot in appState.playerSlots.pairs:
+          if slot == seat and websocket.isPlayerWebSocket():
+            sends.add((ws: websocket, body: $(%*{
+              "type": "decision", "turn": turn, "seat": seat,
+              "deadline_ms": deadlineMs, "observation": request.view})))
+  for send in sends:
+    send.ws.send(send.body, TextMessage)
+
+proc collectExternal(turn, deadlineMs: int,
+                     requests: seq[ExternalRequest]): seq[string] =
+  discard turn
+  discard deadlineMs
+  result = newSeq[string](requests.len)
+  while true:
+    var waiting = false
+    {.gcsafe.}:
+      withLock appState.lock:
+        for position, request in requests:
+          let seat = request.seat
+          if appState.orderResponses[seat].len > 0 and
+              appState.orderResponseAt[seat] <= appState.orderDeadlines[seat]:
+            result[position] = appState.orderResponses[seat]
+          elif getMonoTime() < appState.orderDeadlines[seat]:
+            waiting = true
+    if not waiting: break
+    sleep(10)
+
 proc parseRegistration(
   text: string
-): tuple[ok: bool, prompt, scripted, policy: string] =
+): tuple[ok: bool, prompt, scripted, policy: string, external: bool] =
   ## A seat's ONE Sprite v1 chat message, read as its registration:
   ##   {"type":"register","prompt":"…","scripted":"burrow"|"scatter"|null,
   ##    "policy":"…"}
   ## Anything that is not that object is not a registration.
-  result = (false, "", "", "")
+  result = (false, "", "", "", false)
   if text.len == 0 or text[0] != '{':
     return
   var node: JsonNode
@@ -1178,6 +1228,7 @@ proc parseRegistration(
   if not node{"scripted"}.isNil and node{"scripted"}.kind == JString:
     result.scripted = node{"scripted"}.getStr()
   result.policy = node{"policy"}.getStr()
+  result.external = node{"mode"}.getStr() == "external"
 
 proc seatAlias(sim: SimServer, order: int): string =
   ## The ANONYMOUS in-game name of the cog that will occupy slot `order`,
@@ -1328,6 +1379,10 @@ proc runServerLoop*(
     broadcastTracker =
       if replayLoaded: move(initializedReplay.tracker)
       else: initBroadcastTracker()
+
+  if squadMode:
+    engine.externalDispatch = dispatchExternal
+    engine.externalCollect = collectExternal
 
   while true:
     var
@@ -1715,10 +1770,12 @@ proc runServerLoop*(
               let firstRegistration = not policy.registered
               policy.registered = true
               policy.prompt = registration.prompt.truncateRunes(MaxPromptRunes)
-              policy.isLlm = policy.prompt.len > 0
+              policy.isExternal = registration.external
+              policy.isLlm = policy.prompt.len > 0 and not registration.external
               policy.baseline = parseBaseline(registration.scripted)
               policy.label =
                 if registration.policy.len > 0: registration.policy
+                elif policy.isExternal: "external"
                 elif policy.isLlm: "prompt"
                 else: $policy.baseline
               engine.seats[playerIndex] = policy
@@ -1911,7 +1968,7 @@ proc runServerLoop*(
           if index < 0 or sim.frozenSeeker(index):
             continue
           case turnSources[seat]
-          of dsLlm: inc sim.llmTurns[min(seat, sim.llmTurns.high)]
+          of dsLlm, dsExternal: inc sim.llmTurns[min(seat, sim.llmTurns.high)]
           of dsFallback:
             inc sim.fallbackTurns[min(seat, sim.fallbackTurns.high)]
           of dsScripted: discard

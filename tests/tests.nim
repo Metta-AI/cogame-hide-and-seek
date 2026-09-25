@@ -9,6 +9,7 @@ import
   test_hns_determinism,
   test_hns_vision,
   test_hns_control,
+  test_hns_external,
   test_hns_events,
   test_hns_engine,
   test_hns_replay,

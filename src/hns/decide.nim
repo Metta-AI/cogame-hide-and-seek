@@ -30,10 +30,17 @@ type
     ## What one seat registered as. A seat that registers with neither field
     ## — or never registers at all — is `burrow`.
     isLlm*: bool
+    isExternal*: bool
     prompt*: string
     baseline*: Baseline
     label*: string
     registered*: bool
+
+  ExternalRequest* = tuple[seat: int, view: JsonNode]
+  ExternalDispatch* = proc(turn, deadlineMs: int,
+    requests: seq[ExternalRequest]) {.closure.}
+  ExternalCollect* = proc(turn, deadlineMs: int,
+    requests: seq[ExternalRequest]): seq[string] {.closure.}
 
   DecisionEngine* = object
     client*: LlmClient
@@ -49,9 +56,13 @@ type
     llmOff*: bool              ## the budget guard fired; scripted from here.
     requestStamps*: seq[MonoTime]  ## the rolling 60 s request counter.
     records*: seq[string]      ## chat records queued for the replay writer.
+    externalDispatch*: ExternalDispatch
+    externalCollect*: ExternalCollect
 
-proc initDecisionEngine*(sim: SimServer): DecisionEngine =
-  result.client = newLlmClient(sim.config)
+proc initDecisionEngine*(sim: SimServer,
+                         enableLlm = true): DecisionEngine =
+  result.client = if enableLlm: newLlmClient(sim.config)
+    else: LlmClient(disabled: true)
   result.ctl = initControlState(sim)
   let seats = sim.seatCount()
   result.seats = newSeq[SeatPolicy](seats)
@@ -66,7 +77,9 @@ proc initDecisionEngine*(sim: SimServer): DecisionEngine =
     result.orders[i] = Order(slot: i, intent: intWatch)
 
 proc policyKind*(engine: DecisionEngine, seat: int): string =
-  if seat >= 0 and seat < engine.seats.len and engine.seats[seat].isLlm:
+  if seat >= 0 and seat < engine.seats.len and engine.seats[seat].isExternal:
+    "external"
+  elif seat >= 0 and seat < engine.seats.len and engine.seats[seat].isLlm:
     "llm"
   else:
     "scripted"
@@ -101,6 +114,9 @@ proc roomBlock(sim: SimServer, seeker: bool, myPad: RoomAnchor): JsonNode =
   var pockets = newJArray()
   for anchor in sim.gameMap.anchorsOf(anchorPocket):
     pockets.add(%*{"id": anchor.id, "at": [anchor.x, anchor.y]})
+  var patrol = newJArray()
+  for anchor in sim.gameMap.anchorsOf(anchorPatrol):
+    patrol.add(%*{"id": anchor.id, "at": [anchor.x, anchor.y]})
   result = %*{
     "name": sim.gameMap.name,
     "w": sim.gameMap.width,
@@ -109,6 +125,7 @@ proc roomBlock(sim: SimServer, seeker: bool, myPad: RoomAnchor): JsonNode =
     "doors": doors,
     "regions": regions,
     "pockets": pockets,
+    "patrol": patrol,
     "keep_clear_px": sim.config.keepClearPx
   }
   if seeker:
@@ -385,15 +402,19 @@ proc turn*(
   var
     live: seq[int]
     open: seq[int]
+    external: seq[ExternalRequest]
   for seat in 0 ..< engine.seats.len:
     let index = sim.playerIndexForSlot(seat)
     if index < 0 or sim.frozenSeeker(index):
       continue
     live.add(seat)
   for seat in live:
-    let index = sim.playerIndexForSlot(seat)
     views[seat] = engine.seatViewJson(sim, seat, turnIndex)
-    if engine.seats[seat].isLlm and not engine.llmOff and
+    if engine.seats[seat].isExternal:
+      var view = copy(views[seat])
+      view["your_notes"] = %engine.notes[seat]
+      external.add((seat: seat, view: view))
+    elif engine.seats[seat].isLlm and not engine.llmOff and
         not engine.client.disabled:
       open.add(seat)
     elif engine.seats[seat].isLlm:
@@ -422,6 +443,9 @@ proc turn*(
   if open.len > 0:
     engine.lastBatchStart = getMonoTime()
     engine.batchStarted = true
+
+  if external.len > 0:
+    engine.externalDispatch(turnIndex, sim.config.turnBudgetMs, external)
 
   # --- the rolling rate guard ----------------------------------------------
   if open.len > 0 and engine.rateGuardBlocks(open.len):
@@ -545,6 +569,47 @@ proc turn*(
     ## "falling back" is the phrase phase 60 greps the GAME log for.
     echo "hide-and-seek llm: seat ", seat, " falling back to burrow (",
       cause, ") on turn ", turnIndex
+
+  if external.len > 0:
+    let replies = engine.externalCollect(
+      turnIndex, sim.config.turnBudgetMs, external)
+    doAssert replies.len == external.len
+    for position, request in external:
+      let seat = request.seat
+      let reply = replies[position]
+      let payload = if reply.len > 0 and reply.len <= MaxReplyBytes:
+        extractJsonObject(reply, strict = false) else: nil
+      if not payload.isNil and payload.kind == JObject:
+        let index = sim.playerIndexForSlot(seat)
+        var objectIds, rampIds, anchorIds: seq[string]
+        for obj in sim.objects:
+          objectIds.add(obj.id)
+          if obj.kind == okRamp: rampIds.add(obj.id)
+        for anchor in sim.gameMap.anchors: anchorIds.add(anchor.id)
+        for door in sim.gameMap.doors: anchorIds.add(door.id)
+        for region in sim.gameMap.regions: anchorIds.add(region.id)
+        let parsed = parseOrder(payload, seat, sim.cogAlias(index),
+          objectIds, anchorIds, rampIds, MapWidth - 1, MapHeight - 1)
+        var order = parsed.order
+        if parsed.rejected or not order.fromReply:
+          let keepSay = order.say
+          let keepRadio = order.radio
+          let keepNotes = order.notes
+          order = if engine.haveOrder[seat]: engine.orders[seat]
+            else: engine.burrowFor(sim, seat, turnIndex)
+          order.say = keepSay
+          order.radio = keepRadio
+          order.notes = keepNotes
+          if parsed.rejected: engine.lastResult[seat] = "unknown_object"
+        engine.installOrder(seat, order)
+        sources[seat] = dsExternal
+        latencies[seat] = (getMonoTime() - turnStart).inMilliseconds.int
+      else:
+        engine.installOrder(seat, engine.burrowFor(sim, seat, turnIndex))
+        sources[seat] = dsFallback
+        result.add(fallbackRecord(game, turnIndex, seat, 1,
+          if reply.len == 0: "timeout" else: "parse_error",
+          "external player did not return a bounded order"))
 
 proc resultRecord*(sim: SimServer): string =
   ## The `result` control record — the episode's whole results document,

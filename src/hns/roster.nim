@@ -469,7 +469,10 @@ proc roomResultsJson*(sim: SimServer): string =
         sim.seatPolicyKind[slot]
       else:
         "scripted"
-    if policyKinds[slot] == "llm": sawLlm = true else: sawScripted = true
+    if policyKinds[slot] in ["llm", "external"]:
+      sawLlm = true
+    else:
+      sawScripted = true
     if slot < sim.llmTurns.len: llmTurns[slot] = sim.llmTurns[slot]
     if slot < sim.fallbackTurns.len:
       fallbackTurns[slot] = sim.fallbackTurns[slot]

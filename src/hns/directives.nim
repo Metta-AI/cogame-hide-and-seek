@@ -56,6 +56,7 @@ type
 
   DirectiveSource* = enum
     dsLlm = "llm"
+    dsExternal = "external"
     dsScripted = "scripted"
     dsFallback = "fallback"
 
@@ -115,7 +116,7 @@ proc parseIntent*(text: string): tuple[intent: Intent, known: bool] =
 proc needsObject*(intent: Intent): bool {.inline.} =
   intent in {intPush, intLock, intUnlock, intVault}
 
-proc extractJsonObject*(text: string): JsonNode =
+proc extractJsonObject*(text: string, strict = true): JsonNode =
   ## The outermost balanced `{...}` in a model reply, tolerating markdown
   ## fences and any prose the model prefixed or suffixed. Falls back to
   ## first-brace..last-brace when the scan finds no balanced pair, which is
@@ -148,6 +149,8 @@ proc extractJsonObject*(text: string): JsonNode =
   let
     first = text.find('{')
     last = text.rfind('}')
+  if not strict:
+    return nil
   if first < 0 or last <= first:
     var head = text.strip()
     if head.runeLen > 160:

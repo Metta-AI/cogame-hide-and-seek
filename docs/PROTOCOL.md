@@ -106,6 +106,33 @@ as its own labeled sprite (see `RULES.md`) and is only valid in-game.
   zoomable board layers at 2× (`RenderScale`); its viewport announces the
   scaled size. The sim, the gameHash, and every value quoted in `RULES.md`
   stay in 1× map pixels.
+
+## Commanded Coworld player policies
+
+The packaged six-seat Coworld uses one order per live seat at each turn
+boundary. A player registers with a Sprite chat message containing
+`{"type":"register","mode":"external","policy":"my-policy"}`. Frozen
+seekers receive no preparation-turn request.
+
+The game sends a WebSocket text message with `type: "decision"`, `turn`,
+`seat`, `deadline_ms`, and `observation`. The observation includes public room
+geometry, object positions, teammates, the seat's own state, and only enemies
+it has seen or heard. It includes that seat's private `your_notes`. It never
+includes another policy's identity or private notes.
+
+The player replies with a Sprite chat message whose text is
+`orders:<game>:<turn>:<JSON order>`. The game parses the order through
+`parseOrder`, then compiles actuator masks as usual. Missing and malformed
+responses take the published `burrow` fallback and appear in replay records.
+
+`PLAYER_NUMERIC_URL` selects an `/actions` numeric policy. It receives 356
+numeric values and a mask over 107 game-owned orders, and returns
+`{"actions":[index]}`. `PLAYER_JEV=1` asks Jev System One to choose from the
+same catalog. Both modes run in the ordinary player process; the game owns
+legality, results, and replay. `src/hns/numeric_bridge.nim` exposes the same
+visible order catalog for JSONL training sessions.
+
+
 ## The replay records MASKS, not orders
 
 The determinism boundary sits between the control layer and the sim: the
