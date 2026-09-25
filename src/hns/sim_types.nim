@@ -19,7 +19,10 @@ import
 
 const
   GameName* = "hide-and-seek"
-  GameVersion* = "1"  ## GV1 (first rules): HIDE AND SEEK. Three hiders get
+  GameVersion* = "2"  ## GV2 (player policy orders): ordinary player policies
+    ## choose from the public order catalog, and the seat view includes
+    ## patrol anchors. Obsoletes GV1.
+    ## GV1 (first rules): HIDE AND SEEK. Three hiders get
     ## fifteen seconds alone in a 720x400 room with four crates, two panels
     ## and two ramps; then three seekers walk in with 70-degree torch cones
     ## and thirty seconds. Every hunt tick on which ANY seeker sees ANY hider

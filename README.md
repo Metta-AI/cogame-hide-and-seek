@@ -15,11 +15,23 @@ hiders. Then the two trios **swap sides** and play the same room and the same
 furniture again, and the episode's score is the average of the two — so the
 league grades the policy, not the deal.
 
-**A policy is just a prompt.** A seat sends one JSON order per 3.75-second turn
+Each seat sends one JSON order per 3.75-second turn
 — `move_to`, `hide`, `watch`, `chase`, `push`, `lock`, `unlock`, `vault` — and a
 deterministic driver carries it out. The same image ships two scripted
-baselines (`burrow`, `scatter`) selected by an environment variable, so a
-champion and a filler are byte-identical apart from their environment.
+baselines (`burrow`, `scatter`) selected by an environment variable.
+
+`PLAYER_NUMERIC_URL` runs a numeric `/actions` policy in the player container;
+`PLAYER_JEV=1` runs Jev System One there. Both choose from the game's 107-slot
+order catalog using that seat's observation and send the selected order over
+the ordinary `/player` socket. The game validates the order, drives the cog,
+scores the episode, and records the replay. `PLAYER_PROMPT` remains available
+for prompt policies through the game-side LLM client.
+
+`/bin/hide-and-seek-bridge` is the JSONL training entrypoint. It drives the
+same seeded simulator and order parser across both sides of a match, exposing
+356 visible numeric values, a masked action catalog, and the scripted `burrow`
+teacher for other seats. Its default training episode uses two prep turns and
+three hunt turns per side; the normal Coworld fixture keeps its own clock.
 
 - Rules: [`docs/RULES.md`](docs/RULES.md)
 - The object layer: [`docs/OBJECTS.md`](docs/OBJECTS.md)
@@ -55,8 +67,9 @@ it is an exploit of MuJoCo's 3-D contact dynamics with no meaning in a top-down
 
 - `src/hide_and_seek.nim` — server entrypoint (the seed is randomised HERE,
   before `config.update`, so every seed-derived draw follows the final seed).
-- `src/hide_and_seek_player.nim` — the thin seat registrar
-  (`/bin/hide-and-seek-player`).
+- `src/hide_and_seek_player.nim` — the player policy entrypoint
+- `src/hns/numeric_bridge.nim` — the JSONL training bridge
+  (`/bin/hide-and-seek-bridge`).
 - `src/hns/` — the sim: `sim_types` (consts, wire types, `GameVersion`),
   `room` (the authored room documents and their validator), `objects` (the
   object layer), `phase` (the two-phase clock and the exposure counters),
@@ -90,5 +103,5 @@ the `coworld build` hook and must stay committed **executable**.
 ```bash
 coworld upload-policy coworld-hide-and-seek:latest --name my-hns \
   --run /bin/hide-and-seek-player \
-  --secret-env PLAYER_PROMPT="<your strategy>"
+  --env PLAYER_NUMERIC_URL="<your /actions endpoint>"
 ```
