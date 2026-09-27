@@ -20,8 +20,8 @@ Each seat sends one JSON order per 3.75-second turn
 deterministic driver carries it out. The same image ships two scripted
 baselines (`burrow`, `scatter`) selected by an environment variable.
 
-`PLAYER_NUMERIC_URL` runs a numeric `/actions` policy in the player container;
-`PLAYER_JEV=1` runs Jev System One there. Both choose from the game's 107-slot
+`PLAYER_NUMERIC_URL` runs a numeric `/actions` policy in the player container.
+It chooses from the game's 107-slot
 order catalog using that seat's observation and send the selected order over
 the ordinary `/player` socket. The game validates the order, drives the cog,
 scores the episode, and records the replay. `PLAYER_PROMPT` remains available
