@@ -38,15 +38,16 @@ proc currentView(): JsonNode =
 
 proc currentDecision(): JsonNode =
   let view = currentView()
+  var legalActions = newJArray()
+  for action in actionChoices(view):
+    if action.kind != JNull: legalActions.add(action)
   %*{"kind": "decision", "game": "hide-and-seek",
     "decision_id": decisionId, "seat": currentSeat(),
     "engine_seat": currentSeat(), "turn": game.turnIndex,
     "semantic_view": view, "inbox": [],
     "messages": [{"role": "user", "content": $view}],
     "speech_messages": [],
-    "action_schema": {"type": "object", "additionalProperties": false,
-      "properties": {"intent": {"type": "string"}},
-      "required": ["intent"]},
+    "action_schema": {"type": "object", "enum": legalActions},
     "typed_question": newJNull()}
 
 proc driveUntilDecision() =
