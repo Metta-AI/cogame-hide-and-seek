@@ -127,8 +127,7 @@ responses take the published `burrow` fallback and appear in replay records.
 
 `PLAYER_NUMERIC_URL` selects an `/actions` numeric policy. It receives 356
 numeric values and a mask over 107 game-owned orders, and returns
-`{"actions":[index]}`. `PLAYER_JEV=1` asks Jev System One to choose from the
-same catalog. Both modes run in the ordinary player process; the game owns
+`{"actions":[index]}`. The policy runs in the ordinary player process; the game owns
 legality, results, and replay. `src/hns/numeric_bridge.nim` exposes the same
 visible order catalog for JSONL training sessions.
 
