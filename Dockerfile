@@ -1,5 +1,5 @@
 # Build Docker. ONE image, TWO entrypoints: /bin/hide-and-seek (the game
-# server) and /bin/hide-and-seek-player (the seat policy). Numeric and Jev
+# server) and /bin/hide-and-seek-player (the seat policy). Numeric
 # calls run in the player process. Prompt calls use the game-side LLM client.
 FROM debian:bookworm-slim AS build
 

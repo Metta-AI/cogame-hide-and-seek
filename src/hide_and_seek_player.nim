@@ -1,10 +1,9 @@
-## The hide-and-seek player container runs numeric and Jev policies over the
+## The hide-and-seek player container runs numeric policies over the
 ## ordinary seat socket. Prompt policies use the game-side LLM client.
 ##
 ##   PLAYER_PROMPT        a strategy in plain English -> this seat is an LLM seat
 ##   PLAYER_SCRIPTED      burrow | scatter            -> this seat is scripted
 ##   PLAYER_NUMERIC_URL   an /actions endpoint         -> numeric seat
-##   PLAYER_JEV=1         System One candidate choice  -> Jev seat
 ##   PLAYER_POLICY_LABEL  a free label for the replay's `register` record
 ##
 ## A seat that sets neither is `burrow`. To field your own policy, reuse
@@ -18,7 +17,7 @@ import
   std/[json, options, os, random, strutils, times, unicode],
   bitworld/spriteprotocol,
   whisky,
-  hns/numeric_policy, hns/jev_policy
+  hns/numeric_policy
 
 const
   ConnectAttempts = 240      ## 240 x 500 ms = 2 minutes of dialling.
@@ -79,12 +78,10 @@ when isMainModule:
     prompt = getEnv("PLAYER_PROMPT").strip()
     scripted = getEnv("PLAYER_SCRIPTED").strip()
     numeric = getEnv("PLAYER_NUMERIC_URL").strip().len > 0
-    jev = getEnv("PLAYER_JEV") == "1"
-    external = numeric or jev
+    external = numeric
     label = block:
       let explicit = getEnv("PLAYER_POLICY_LABEL").strip()
       if explicit.len > 0: explicit
-      elif jev: "jev"
       elif numeric: "numeric"
       elif prompt.len > 0: "prompt"
       elif scripted.len > 0: scripted
@@ -93,7 +90,7 @@ when isMainModule:
     (if external: "external" elif prompt.len > 0: "llm" else: "scripted"),
     " baseline=", (if scripted.len > 0: scripted else: "burrow"),
     " label=", label
-  if external and (prompt.len > 0 or scripted.len > 0) or numeric and jev:
+  if external and (prompt.len > 0 or scripted.len > 0):
     quit("Choose exactly one player policy mode", 1)
   randomize()
   let session = "hns:" & $getCurrentProcessId() & ":" &
@@ -156,8 +153,7 @@ when isMainModule:
         if external and received.get().kind == TextMessage:
           let request = parseJson(received.get().data)
           if request["type"].getStr() == "decision":
-            let order = if numeric: chooseNumericOrder(request, session)
-              else: chooseJevOrder(request)
+            let order = chooseNumericOrder(request, session)
             socket.send(orderBlob(request, order), BinaryMessage)
         socket.send(readyBlob(), BinaryMessage)
     except CatchableError as error:
