@@ -15,7 +15,8 @@ proc chooseNumericOrder*(request: JsonNode, session: string): JsonNode =
   let key = getEnv("PLAYER_NUMERIC_KEY")
   if key.len > 0: headers["authorization"] = "Bearer " & key
   let body = %*{"session": session, "seat": request["seat"],
-    "decision_id": request["turn"],
+    "decision_id": (request["observation"]["game"].getInt() - 1) *
+      1_000_000 + request["turn"].getInt(),
     "values": values(request["observation"]), "action_mask": mask}
   let response = newCurly().post(endpoint, headers, $body,
     max(1, (request["deadline_ms"].getInt() - 1000) div 1000))
