@@ -18,9 +18,7 @@
       "run": [
         "/bin/hide-and-seek"
       ],
-      "env": {
-        "ANTHROPIC_API_KEY_URI": "secret://coworld/hide-and-seek/anthropic_api_key"
-      }
+      "env": {}
     },
     "replay_viewer": {
       "bundle": "static-replay-viewer"

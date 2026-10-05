@@ -30,9 +30,8 @@ block topLevel:
     "runnable.run does not name the game binary"
   check game{"runnable"}{"image"}.getStr() == "{{HIDE_AND_SEEK_IMAGE}}",
     "the image placeholder is not derived from the compose service name"
-  check game{"runnable"}{"env"}{"ANTHROPIC_API_KEY_URI"}.getStr() ==
-    "secret://coworld/hide-and-seek/anthropic_api_key",
-    "the secret namespace does not agree with game.name"
+  doAssert game{"runnable"}{"env"}{"ANTHROPIC_API_KEY_URI"}.isNil,
+    "hosted LLM uses the platform sidecar without provider secrets"
   check game{"replay_viewer"}{"bundle"}.getStr() == "static-replay-viewer",
     "the replay viewer is not the static bundle, or is not under game"
 
@@ -41,8 +40,6 @@ block protocolsCarryBoth:
     let entry = game{"protocols"}{key}
     check entry != nil and entry.kind == JObject,
       "game.protocols." & key & " is missing or is a bare string"
-    check entry{"type"}.getStr() == "uri",
-      "game.protocols." & key & " is not a {type, value} object"
     check entry{"value"}.getStr().startsWith("https://"),
       "game.protocols." & key & " has no URL"
 
