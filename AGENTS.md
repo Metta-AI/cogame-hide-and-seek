@@ -80,8 +80,9 @@ engine's load-time validator would reject and additionally checks that every
 
 `data/cog_{hider,seeker}.png` and `data/obj_{crate,panel,ramp}.png` are split
 out of the committed nano-banana sheets under `scripts/art/source/` by
-`python3 scripts/art/split_cog_sheet.py`. Regenerate the sheets only through
-`playbooks/art-nanobanana.md`'s recipe; never hand-edit the derived PNGs.
+`python3 scripts/art/split_cog_sheet.py`. The source sheets are the reproducible inputs; never hand-edit derived PNGs.
+An image-generation recipe is not included in this checkout. Preserve the
+committed sheets and record the prompt, model, and settings with any replacement.
 
 ## The viewer
 
