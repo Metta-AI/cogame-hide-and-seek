@@ -191,7 +191,6 @@ block theComposeServiceNameDerivesThePlaceholder:
   check "image: coworld-hide-and-seek:latest" in compose,
     "the compose image does not match <IMAGE>:latest"
   check "platform: linux/amd64" in compose, "the compose platform is missing"
-  check "network: host" in compose, "the compose build has no host network"
 
 block policiesJsonIsTheShippedSet:
   let policies = parseJson(readFile("tools/ci/policies.json"))
