@@ -21,11 +21,40 @@ import json
 import sys
 
 import yaml
+from jsonschema import ValidationError, validate
 from coworld.bundle import _load_template_manifest
+
+
+def validate_controller_results(schema: dict) -> None:
+    """Exercise result validation for every controller emitted by policyKind."""
+    result = {
+        "names": [f"policy-{i}" for i in range(6)],
+        "aliases": ["HIDER-alpha", "SEEKER-alpha", "HIDER-beta",
+                    "SEEKER-beta", "HIDER-gamma", "SEEKER-gamma"],
+        "team": ["hiders", "seekers"] * 3,
+        "scores": [0.0] * 6,
+        "win": [False] * 6,
+        "reason": "complete",
+        "endRule": "full_time",
+        "games": 2,
+    }
+    for kind in ("llm", "scripted", "external"):
+        result["policyKinds"] = [kind] * 6
+        validate(result, schema)
+    result["policyKinds"] = ["llm", "external", "scripted"] * 2
+    validate(result, schema)
+    result["policyKinds"][0] = "unknown-controller"
+    try:
+        validate(result, schema)
+    except ValidationError:
+        pass
+    else:
+        raise AssertionError("results schema accepted an unknown controller kind")
 
 
 def main() -> int:
     template = json.load(open("coworld_manifest_template.json"))
+    validate_controller_results(template["game"]["results_schema"])
     compose = yaml.safe_load(open("compose.yaml"))
     placeholders = {
         "{{%s_IMAGE}}" % name.upper().replace("-", "_"): service["image"]
