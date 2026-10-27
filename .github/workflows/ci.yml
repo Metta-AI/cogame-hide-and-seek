@@ -236,7 +236,8 @@ jobs:
   # container (Dockerfile.replay-viewer) because the runner has no emcc.
   # ---------------------------------------------------------------------
   wasm-viewer:
-    runs-on: ubuntu-latest
+    # Playwright 1.55.0 supports Ubuntu 24.04; ubuntu-latest can select 26.04.
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     # The bundle is EXECUTED here, not merely built, and it is executed against
     # the replay docker-smoke just produced -- hence the dependency.
@@ -410,7 +411,8 @@ jobs:
   # data-replay-error for the smoke to read.
   # ---------------------------------------------------------------------
   renderer-fixture:
-    runs-on: ubuntu-latest
+    # Playwright 1.55.0 supports Ubuntu 24.04; ubuntu-latest can select 26.04.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
