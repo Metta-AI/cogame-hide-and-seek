@@ -493,7 +493,8 @@
             "type": "string",
             "enum": [
               "llm",
-              "scripted"
+              "scripted",
+              "external"
             ]
           },
           "minItems": 6,
