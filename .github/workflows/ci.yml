@@ -157,6 +157,11 @@ jobs:
         # when `node` is absent, so its coverage depended on a runner detail.
         run: node tools/ci/page_smoke.mjs
 
+      - name: Select Python for the pinned Coworld CLI
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
       - name: Validate the manifest under the installed coworld CLI
         # The note's test 34. `coworld build` runs only in coworld-release.yml,
         # i.e. at release time: until this step, nothing in CI ran the
